@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Metric Fund Backtester</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace">
+        <aside class="sidebar">
+          <div class="app-title">
+            <span class="mark">MF</span>
+            <div>
+              <h1>Metric Fund</h1>
+              <p>Backtest builder</p>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-heading">
+              <h2>Base Numbers</h2>
+              <input id="metric-search" type="search" placeholder="Search" />
+            </div>
+            <div id="base-metrics" class="metric-list"></div>
+          </div>
+        </aside>
+
+        <section class="main">
+          <div class="topbar">
+            <div>
+              <h2>Build A Fund Rule</h2>
+              <p>Define metrics, filter stocks, and rebalance quarterly from the QuickFS data.</p>
+            </div>
+            <button id="run" class="primary">Run Backtest</button>
+          </div>
+
+          <div class="grid">
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Custom Metrics</h2>
+                <button id="add-metric" class="ghost">Add</button>
+              </div>
+              <div id="custom-metrics" class="stack"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Conditions</h2>
+                <button id="add-condition" class="ghost">Add</button>
+              </div>
+              <div id="conditions" class="stack"></div>
+              <div class="settings">
+                <label>
+                  Max holdings
+                  <input id="max-holdings" type="number" value="0" min="0" step="1" />
+                </label>
+                <label>
+                  Min price
+                  <input id="min-price" type="number" value="1" min="0" step="0.5" />
+                </label>
+              </div>
+            </section>
+          </div>
+
+          <section class="panel results">
+            <div class="result-head">
+              <div>
+                <h2>Fund Value</h2>
+                <p id="summary">Run a backtest to see the curve.</p>
+              </div>
+              <div id="stats" class="stats"></div>
+            </div>
+            <canvas id="chart" width="1100" height="360"></canvas>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <h2>Period Detail</h2>
+              <select id="period-select"></select>
+            </div>
+            <div id="period-detail" class="detail"></div>
+          </section>
+        </section>
+      </section>
+    </main>
+    <script src="/script.js"></script>
+  </body>
+</html>
