@@ -112,6 +112,18 @@ def number_or_nan(value):
         return math.nan
 
 
+def json_safe(value):
+    if isinstance(value, dict):
+        return {key: json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [json_safe(item) for item in value]
+    if isinstance(value, tuple):
+        return [json_safe(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
 def get_periods(data):
     periods = data.get("period_end_date") or data.get("fiscal_quarter_key") or []
     return [str(period) for period in periods]
@@ -373,7 +385,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def send_json(self, value, status=200):
-        body = json.dumps(value).encode("utf-8")
+        body = json.dumps(json_safe(value), allow_nan=False).encode("utf-8")
         self.send_response(status)
         self.send_header("content-type", "application/json")
         self.send_header("content-length", str(len(body)))

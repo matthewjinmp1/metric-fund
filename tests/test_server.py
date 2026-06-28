@@ -73,6 +73,21 @@ class FormulaTests(unittest.TestCase):
             )
         )
 
+    def test_json_safe_replaces_non_finite_numbers(self):
+        cleaned = server.json_safe(
+            {
+                "valid": 1.2,
+                "bad": math.nan,
+                "nested": [math.inf, -math.inf, {"ok": 3}],
+            }
+        )
+
+        self.assertEqual(
+            cleaned,
+            {"valid": 1.2, "bad": None, "nested": [None, None, {"ok": 3}]},
+        )
+        self.assertNotIn("NaN", json.dumps(cleaned, allow_nan=False))
+
 
 class BacktestTests(unittest.TestCase):
     def test_metric_catalog_reads_numeric_fields_from_sample_rows(self):
