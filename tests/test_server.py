@@ -1,7 +1,9 @@
 import json
 import math
+import os
 import sqlite3
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -176,6 +178,24 @@ class BacktestTests(unittest.TestCase):
         self.assertEqual(result["series"][0]["holdings"], 1)
         self.assertEqual(result["series"][0]["sample"][0]["ticker"], "HIGH")
         self.assertAlmostEqual(result["finalValue"], 150.0)
+
+
+class VersionTests(unittest.TestCase):
+    def test_app_version_reflects_latest_source_mtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            public = Path(tmp) / "public"
+            public.mkdir()
+            server_file = Path(tmp) / "server.py"
+            script_file = public / "script.js"
+            server_file.write_text("print('server')\n")
+            script_file.write_text("console.log('v1');\n")
+            now = time.time()
+            older = now - 10
+            newer = now - 2
+            with patch.object(server, "__file__", str(server_file)), patch.object(server, "PUBLIC", public):
+                os.utime(server_file, (older, older))
+                os.utime(script_file, (newer, newer))
+                self.assertEqual(server.app_version(), f"{newer:.6f}")
 
 
 if __name__ == "__main__":

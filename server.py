@@ -5,6 +5,7 @@ import math
 import mimetypes
 import os
 import sqlite3
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -19,6 +20,7 @@ DB_PATH = Path(
     )
 )
 START_VALUE = 100.0
+APP_STARTED_AT = time.time()
 
 
 DEFAULT_METRICS = [
@@ -126,6 +128,19 @@ def get_value(data, key, index):
 
 def period_values(data, index, base_keys):
     return {key: get_value(data, key, index) for key in base_keys}
+
+
+def source_files():
+    files = [Path(__file__).resolve()]
+    if PUBLIC.exists():
+        for suffix in ("*.html", "*.css", "*.js"):
+            files.extend(PUBLIC.rglob(suffix))
+    return sorted({path.resolve() for path in files if path.exists()})
+
+
+def app_version():
+    latest_mtime = max((path.stat().st_mtime for path in source_files()), default=APP_STARTED_AT)
+    return f"{latest_mtime:.6f}"
 
 
 def load_rows():
@@ -318,6 +333,9 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/metrics":
             self.send_json(self.handle_metrics())
             return
+        if parsed.path == "/api/version":
+            self.send_json({"version": app_version(), "startedAt": APP_STARTED_AT})
+            return
         path = parsed.path.lstrip("/") or "index.html"
         self.serve_static(path)
 
@@ -371,7 +389,12 @@ def main():
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     print(f"Metric fund app running at http://127.0.0.1:{port}")
     print(f"Using financials DB: {DB_PATH}")
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("Metric fund app stopping.")
+    finally:
+        server.server_close()
 
 
 if __name__ == "__main__":

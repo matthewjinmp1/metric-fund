@@ -38,6 +38,7 @@ function saveState() {
 }
 
 async function init() {
+  startLiveReload();
   loadSaved();
   const res = await fetch("/api/metrics");
   const data = await res.json();
@@ -52,6 +53,26 @@ async function init() {
   $("add-condition").addEventListener("click", addCondition);
   $("metric-search").addEventListener("input", renderBaseMetrics);
   $("period-select").addEventListener("change", renderPeriodDetail);
+}
+
+function startLiveReload() {
+  let activeVersion = null;
+  let sawServerError = false;
+  setInterval(async () => {
+    try {
+      const res = await fetch(`/api/version?t=${Date.now()}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("version check failed");
+      const data = await res.json();
+      if (activeVersion && (data.version !== activeVersion || sawServerError)) {
+        window.location.reload();
+        return;
+      }
+      activeVersion = data.version;
+      sawServerError = false;
+    } catch (_error) {
+      sawServerError = true;
+    }
+  }, 1500);
 }
 
 function renderBaseMetrics() {

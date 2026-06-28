@@ -8,4 +8,8 @@ export PORT
 export FINANCIALS_DB
 export PYTHONDONTWRITEBYTECODE=1
 
-python3 -B server.py
+if [[ "${AUTO_RELOAD:-1}" == "1" ]]; then
+  python3 -B dev_reloader.py
+else
+  python3 -B server.py
+fi
