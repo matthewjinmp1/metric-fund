@@ -257,15 +257,26 @@ def build_backtest(payload):
     user_metrics = payload.get("metrics") or DEFAULT_METRICS
     conditions = payload.get("conditions") or [{"metric": "ROA", "operator": ">", "value": 0.1}]
     max_holdings = int(payload.get("maxHoldings") or 0)
+    min_holdings = max(1, int(payload.get("minHoldings") or 1))
     min_price = float(payload.get("minPrice") or 1)
+    min_market_cap = float(payload.get("minMarketCap") or 0)
+    max_stock_return = float(payload.get("maxStockReturn") or 10)
     metrics = compile_metrics(user_metrics)
     base_keys = set()
     for metric in metrics:
         base_keys.update(metric["compiled"].names)
-    base_keys.update(["period_end_price", "dividends"])
+    base_keys.update(["period_end_price", "dividends", "market_cap"])
 
     rows = load_rows()
     by_period = {}
+    all_periods = set()
+    excluded = {
+        "price": 0,
+        "marketCap": 0,
+        "metricCondition": 0,
+        "returnOutlier": 0,
+        "tooFewHoldingsPeriods": 0,
+    }
     for row in rows:
         data = row["data"]
         prices = data.get("period_end_price")
@@ -276,16 +287,24 @@ def build_backtest(payload):
             price = number_or_nan(get_value(data, "period_end_price", index))
             next_price = number_or_nan(get_value(data, "period_end_price", index + 1))
             dividend = number_or_nan(dividends[index + 1] if index + 1 < len(dividends) else 0)
+            all_periods.add(period)
             if not (is_number(price) and is_number(next_price)) or price < min_price or next_price <= 0:
+                excluded["price"] += 1
+                continue
+            market_cap = number_or_nan(get_value(data, "market_cap", index))
+            if min_market_cap and (not is_number(market_cap) or market_cap < min_market_cap):
+                excluded["marketCap"] += 1
                 continue
             values = period_values(data, index, base_keys)
             metric_values = {}
             for metric in metrics:
                 metric_values[metric["name"]] = metric["compiled"].evaluate(values)
             if not passes_conditions(metric_values, conditions):
+                excluded["metricCondition"] += 1
                 continue
             total_return = ((next_price + (dividend if is_number(dividend) else 0)) / price) - 1
-            if not is_number(total_return) or total_return < -0.95 or total_return > 10:
+            if not is_number(total_return) or total_return < -0.95 or total_return > max_stock_return:
+                excluded["returnOutlier"] += 1
                 continue
             by_period.setdefault(period, []).append(
                 {
@@ -295,14 +314,15 @@ def build_backtest(payload):
                     "return": total_return,
                     "metrics": metric_values,
                     "price": price,
+                    "marketCap": market_cap if is_number(market_cap) else None,
                 }
             )
 
     value = START_VALUE
     series = []
-    periods = sorted(by_period.keys())
+    periods = sorted(all_periods)
     for period in periods:
-        holdings = by_period[period]
+        holdings = by_period.get(period, [])
         if max_holdings > 0:
             sort_metric = conditions[0]["metric"] if conditions else metrics[0]["name"]
             holdings = sorted(
@@ -310,7 +330,12 @@ def build_backtest(payload):
                 key=lambda item: number_or_nan(item["metrics"].get(sort_metric)),
                 reverse=True,
             )[:max_holdings]
-        avg_return = sum(item["return"] for item in holdings) / len(holdings)
+        if len(holdings) < min_holdings:
+            excluded["tooFewHoldingsPeriods"] += 1
+            holdings = []
+            avg_return = 0
+        else:
+            avg_return = sum(item["return"] for item in holdings) / len(holdings)
         value *= 1 + avg_return
         series.append(
             {
@@ -326,14 +351,23 @@ def build_backtest(payload):
         "dbPath": str(DB_PATH),
         "metrics": [{"name": m["name"], "formula": m["formula"]} for m in metrics],
         "conditions": conditions,
+        "filters": {
+            "minPrice": min_price,
+            "minMarketCap": min_market_cap,
+            "minHoldings": min_holdings,
+            "maxHoldings": max_holdings,
+            "maxStockReturn": max_stock_return,
+        },
         "startValue": START_VALUE,
         "finalValue": value if series else START_VALUE,
         "totalReturn": (value / START_VALUE - 1) if series else 0,
         "periods": len(series),
         "series": series,
+        "excluded": excluded,
         "notes": [
             "Quarterly equal-weight portfolio.",
             "Signals use values at period t; returns use period_end_price t to t+1 plus next period dividend.",
+            "Periods with too few qualifying holdings stay in cash.",
             "No delisting, liquidity, slippage, survivorship, or filing-lag adjustments yet.",
         ],
     }

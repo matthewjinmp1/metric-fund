@@ -215,7 +215,10 @@ async function runBacktest() {
         metrics: state.customMetrics,
         conditions: state.conditions,
         maxHoldings: Number($("max-holdings").value || 0),
+        minHoldings: Number($("min-holdings").value || 1),
         minPrice: Number($("min-price").value || 1),
+        minMarketCap: Number($("min-market-cap").value || 0),
+        maxStockReturn: Number($("max-stock-return").value || 10),
       }),
     });
     const data = await res.json();
@@ -238,6 +241,7 @@ function renderResult() {
     <div class="stat"><strong>${formatNumber(result.finalValue)}</strong><span>final value</span></div>
     <div class="stat"><strong>${formatPct(result.totalReturn)}</strong><span>total return</span></div>
     <div class="stat"><strong>${result.periods}</strong><span>quarters</span></div>
+    <div class="stat"><strong>${result.excluded?.tooFewHoldingsPeriods ?? 0}</strong><span>cash quarters</span></div>
   `;
   drawChart(result.series);
   $("period-select").innerHTML = result.series
@@ -322,7 +326,7 @@ function renderPeriodDetail() {
   const item = result.series[Number($("period-select").value || 0)];
   const rows = item.sample || [];
   $("period-detail").innerHTML = `
-    <p>${item.period}: ${item.holdings} holdings, next-quarter return ${formatPct(item.return)}</p>
+    <p>${item.period}: ${item.holdings} holdings, next-quarter return ${formatPct(item.return)}${item.holdings === 0 ? " · cash" : ""}</p>
     <table>
       <thead>
         <tr>
@@ -330,6 +334,7 @@ function renderPeriodDetail() {
           <th>Company</th>
           <th>Return</th>
           <th>Price</th>
+          <th>Market Cap</th>
           ${result.metrics.map((metric) => `<th>${escapeHtml(metric.name)}</th>`).join("")}
         </tr>
       </thead>
@@ -342,6 +347,7 @@ function renderPeriodDetail() {
                 <td>${escapeHtml(row.companyName || "")}</td>
                 <td>${formatPct(row.return)}</td>
                 <td>${formatNumber(row.price)}</td>
+                <td>${formatNumber(row.marketCap)}</td>
                 ${result.metrics.map((metric) => `<td>${formatNumber(row.metrics[metric.name], 4)}</td>`).join("")}
               </tr>
             `,
