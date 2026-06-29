@@ -428,6 +428,7 @@ function renderResult() {
             <span>${item.period}</span>
             <span>${formatCount(item.holdings)} holdings</span>
             <span>${formatCount(item.available)} available</span>
+            <span>${formatPct(item.return)} return</span>
           </button>
           <div class="detail inline-detail" data-period-detail-index="${index}"></div>
         </div>`,
