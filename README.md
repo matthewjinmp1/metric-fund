@@ -34,6 +34,6 @@ FINANCIALS_DB=/path/to/financials.db ./start_server.sh
 - Formula metrics such as `net_income / total_assets`
 - Conditions such as `ROA > 0.10`
 - Uses `period_end_price` plus dividends for next-period returns
-- Optional investability guardrails for minimum price, market cap, holdings count, and maximum one-period stock return
+- Optional minimum revenue filter, defaulting to `$1B`
 
 This is an early prototype. It does not yet handle filing lags, liquidity constraints, delistings, survivorship bias, slippage, taxes, or transaction costs.

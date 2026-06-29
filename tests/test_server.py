@@ -143,7 +143,6 @@ class BacktestTests(unittest.TestCase):
         payload = {
             "metrics": [{"name": "ROA", "formula": "net_income / total_assets"}],
             "conditions": [{"metric": "ROA", "operator": ">", "value": 0.1}],
-            "minPrice": 1,
         }
 
         with temp, patch.object(server, "DB_PATH", db_path):
@@ -184,7 +183,6 @@ class BacktestTests(unittest.TestCase):
             "metrics": [{"name": "ROA", "formula": "net_income / total_assets"}],
             "conditions": [{"metric": "ROA", "operator": ">", "value": 0.1}],
             "maxHoldings": 1,
-            "minPrice": 1,
         }
 
         with temp, patch.object(server, "DB_PATH", db_path):
@@ -194,17 +192,17 @@ class BacktestTests(unittest.TestCase):
         self.assertEqual(result["series"][0]["sample"][0]["ticker"], "HIGH")
         self.assertAlmostEqual(result["finalValue"], 150.0)
 
-    def test_backtest_applies_market_cap_and_min_holdings_filters(self):
+    def test_backtest_applies_minimum_revenue_filter(self):
         temp, db_path = write_test_db(
             [
                 {
-                    "ticker": "MICRO",
+                    "ticker": "SMALLREV",
                     "data": {
                         "period_end_date": ["2020-03", "2020-06"],
                         "net_income": [50, 50],
                         "total_assets": [100, 100],
                         "period_end_price": [1, 10],
-                        "market_cap": [1_000_000, 10_000_000],
+                        "revenue": [100_000_000, 120_000_000],
                     },
                 },
                 {
@@ -214,7 +212,7 @@ class BacktestTests(unittest.TestCase):
                         "net_income": [20, 20],
                         "total_assets": [100, 100],
                         "period_end_price": [10, 11],
-                        "market_cap": [1_000_000_000, 1_100_000_000],
+                        "revenue": [1_000_000_000, 1_100_000_000],
                     },
                 },
             ]
@@ -222,48 +220,16 @@ class BacktestTests(unittest.TestCase):
         payload = {
             "metrics": [{"name": "ROA", "formula": "net_income / total_assets"}],
             "conditions": [{"metric": "ROA", "operator": ">", "value": 0.1}],
-            "minMarketCap": 300_000_000,
-            "minHoldings": 2,
-            "minPrice": 1,
+            "minRevenue": 1_000_000_000,
         }
 
         with temp, patch.object(server, "DB_PATH", db_path):
             result = server.build_backtest(payload)
 
-        self.assertEqual(result["series"][0]["holdings"], 0)
-        self.assertEqual(result["series"][0]["return"], 0)
-        self.assertEqual(result["finalValue"], 100)
-        self.assertEqual(result["excluded"]["marketCap"], 1)
-        self.assertEqual(result["excluded"]["tooFewHoldingsPeriods"], 1)
-
-    def test_backtest_excludes_one_period_return_outliers(self):
-        temp, db_path = write_test_db(
-            [
-                {
-                    "ticker": "SPIKE",
-                    "data": {
-                        "period_end_date": ["2020-03", "2020-06"],
-                        "net_income": [20, 20],
-                        "total_assets": [100, 100],
-                        "period_end_price": [10, 50],
-                        "market_cap": [1_000_000_000, 5_000_000_000],
-                    },
-                }
-            ]
-        )
-        payload = {
-            "metrics": [{"name": "ROA", "formula": "net_income / total_assets"}],
-            "conditions": [{"metric": "ROA", "operator": ">", "value": 0.1}],
-            "maxStockReturn": 2,
-            "minPrice": 1,
-        }
-
-        with temp, patch.object(server, "DB_PATH", db_path):
-            result = server.build_backtest(payload)
-
-        self.assertEqual(result["series"][0]["holdings"], 0)
-        self.assertEqual(result["excluded"]["returnOutlier"], 1)
-
+        self.assertEqual(result["series"][0]["holdings"], 1)
+        self.assertEqual(result["series"][0]["sample"][0]["ticker"], "LARGE")
+        self.assertAlmostEqual(result["finalValue"], 110)
+        self.assertEqual(result["excluded"]["revenue"], 1)
 
 class VersionTests(unittest.TestCase):
     def test_app_version_reflects_latest_source_mtime(self):

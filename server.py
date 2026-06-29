@@ -257,25 +257,20 @@ def build_backtest(payload):
     user_metrics = payload.get("metrics") or DEFAULT_METRICS
     conditions = payload.get("conditions") or [{"metric": "ROA", "operator": ">", "value": 0.1}]
     max_holdings = int(payload.get("maxHoldings") or 0)
-    min_holdings = max(1, int(payload.get("minHoldings") or 1))
-    min_price = float(payload.get("minPrice") or 1)
-    min_market_cap = float(payload.get("minMarketCap") or 0)
-    max_stock_return = float(payload.get("maxStockReturn") or 10)
+    min_revenue = float(payload.get("minRevenue") or 0)
     metrics = compile_metrics(user_metrics)
     base_keys = set()
     for metric in metrics:
         base_keys.update(metric["compiled"].names)
-    base_keys.update(["period_end_price", "dividends", "market_cap"])
+    base_keys.update(["period_end_price", "dividends", "market_cap", "revenue"])
 
     rows = load_rows()
     by_period = {}
     all_periods = set()
     excluded = {
         "price": 0,
-        "marketCap": 0,
+        "revenue": 0,
         "metricCondition": 0,
-        "returnOutlier": 0,
-        "tooFewHoldingsPeriods": 0,
     }
     for row in rows:
         data = row["data"]
@@ -288,13 +283,14 @@ def build_backtest(payload):
             next_price = number_or_nan(get_value(data, "period_end_price", index + 1))
             dividend = number_or_nan(dividends[index + 1] if index + 1 < len(dividends) else 0)
             all_periods.add(period)
-            if not (is_number(price) and is_number(next_price)) or price < min_price or next_price <= 0:
+            if not (is_number(price) and is_number(next_price)) or price <= 0 or next_price <= 0:
                 excluded["price"] += 1
                 continue
-            market_cap = number_or_nan(get_value(data, "market_cap", index))
-            if min_market_cap and (not is_number(market_cap) or market_cap < min_market_cap):
-                excluded["marketCap"] += 1
+            revenue = number_or_nan(get_value(data, "revenue", index))
+            if min_revenue and (not is_number(revenue) or revenue < min_revenue):
+                excluded["revenue"] += 1
                 continue
+            market_cap = number_or_nan(get_value(data, "market_cap", index))
             values = period_values(data, index, base_keys)
             metric_values = {}
             for metric in metrics:
@@ -303,8 +299,7 @@ def build_backtest(payload):
                 excluded["metricCondition"] += 1
                 continue
             total_return = ((next_price + (dividend if is_number(dividend) else 0)) / price) - 1
-            if not is_number(total_return) or total_return < -0.95 or total_return > max_stock_return:
-                excluded["returnOutlier"] += 1
+            if not is_number(total_return):
                 continue
             by_period.setdefault(period, []).append(
                 {
@@ -315,6 +310,7 @@ def build_backtest(payload):
                     "metrics": metric_values,
                     "price": price,
                     "marketCap": market_cap if is_number(market_cap) else None,
+                    "revenue": revenue if is_number(revenue) else None,
                 }
             )
 
@@ -330,12 +326,7 @@ def build_backtest(payload):
                 key=lambda item: number_or_nan(item["metrics"].get(sort_metric)),
                 reverse=True,
             )[:max_holdings]
-        if len(holdings) < min_holdings:
-            excluded["tooFewHoldingsPeriods"] += 1
-            holdings = []
-            avg_return = 0
-        else:
-            avg_return = sum(item["return"] for item in holdings) / len(holdings)
+        avg_return = sum(item["return"] for item in holdings) / len(holdings) if holdings else 0
         value *= 1 + avg_return
         series.append(
             {
@@ -352,11 +343,8 @@ def build_backtest(payload):
         "metrics": [{"name": m["name"], "formula": m["formula"]} for m in metrics],
         "conditions": conditions,
         "filters": {
-            "minPrice": min_price,
-            "minMarketCap": min_market_cap,
-            "minHoldings": min_holdings,
+            "minRevenue": min_revenue,
             "maxHoldings": max_holdings,
-            "maxStockReturn": max_stock_return,
         },
         "startValue": START_VALUE,
         "finalValue": value if series else START_VALUE,
@@ -367,7 +355,7 @@ def build_backtest(payload):
         "notes": [
             "Quarterly equal-weight portfolio.",
             "Signals use values at period t; returns use period_end_price t to t+1 plus next period dividend.",
-            "Periods with too few qualifying holdings stay in cash.",
+            "Periods with no qualifying holdings stay in cash.",
             "No delisting, liquidity, slippage, survivorship, or filing-lag adjustments yet.",
         ],
     }

@@ -215,10 +215,7 @@ async function runBacktest() {
         metrics: state.customMetrics,
         conditions: state.conditions,
         maxHoldings: Number($("max-holdings").value || 0),
-        minHoldings: Number($("min-holdings").value || 1),
-        minPrice: Number($("min-price").value || 1),
-        minMarketCap: Number($("min-market-cap").value || 0),
-        maxStockReturn: Number($("max-stock-return").value || 10),
+        minRevenue: Number($("min-revenue").value || 0),
       }),
     });
     const data = await res.json();
@@ -241,7 +238,7 @@ function renderResult() {
     <div class="stat"><strong>${formatNumber(result.finalValue)}</strong><span>final value</span></div>
     <div class="stat"><strong>${formatPct(result.totalReturn)}</strong><span>total return</span></div>
     <div class="stat"><strong>${result.periods}</strong><span>quarters</span></div>
-    <div class="stat"><strong>${result.excluded?.tooFewHoldingsPeriods ?? 0}</strong><span>cash quarters</span></div>
+    <div class="stat"><strong>${result.series.filter((item) => item.holdings === 0).length}</strong><span>cash quarters</span></div>
   `;
   drawChart(result.series);
   $("period-select").innerHTML = result.series
@@ -335,6 +332,7 @@ function renderPeriodDetail() {
           <th>Return</th>
           <th>Price</th>
           <th>Market Cap</th>
+          <th>Revenue</th>
           ${result.metrics.map((metric) => `<th>${escapeHtml(metric.name)}</th>`).join("")}
         </tr>
       </thead>
@@ -348,6 +346,7 @@ function renderPeriodDetail() {
                 <td>${formatPct(row.return)}</td>
                 <td>${formatNumber(row.price)}</td>
                 <td>${formatNumber(row.marketCap)}</td>
+                <td>${formatNumber(row.revenue)}</td>
                 ${result.metrics.map((metric) => `<td>${formatNumber(row.metrics[metric.name], 4)}</td>`).join("")}
               </tr>
             `,
