@@ -3,7 +3,11 @@ const state = {
   customMetrics: [],
   conditions: [],
   result: null,
+  savedBacktests: [],
 };
+
+const BACKTEST_DB = "metricFundBacktests";
+const BACKTEST_STORE = "backtests";
 
 const starterMetricRevisions = new Map(
   [
@@ -78,8 +82,67 @@ async function init() {
   $("run").addEventListener("click", runBacktest);
   $("add-metric").addEventListener("click", addMetric);
   $("add-condition").addEventListener("click", addCondition);
+  $("save-backtest").addEventListener("click", saveCurrentBacktest);
   $("metric-search").addEventListener("input", renderBaseMetrics);
   $("period-list").addEventListener("click", handlePeriodClick);
+  $("saved-backtests").addEventListener("click", handleSavedBacktestClick);
+  await refreshSavedBacktests();
+}
+
+function openBacktestDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(BACKTEST_DB, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(BACKTEST_STORE)) {
+        db.createObjectStore(BACKTEST_STORE, { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function withBacktestStore(mode, callback) {
+  const db = await openBacktestDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(BACKTEST_STORE, mode);
+    const store = tx.objectStore(BACKTEST_STORE);
+    const request = callback(store);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+  });
+}
+
+async function listSavedBacktests() {
+  const rows = await withBacktestStore("readonly", (store) => store.getAll());
+  return rows.sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)));
+}
+
+async function putSavedBacktest(record) {
+  return withBacktestStore("readwrite", (store) => store.put(record));
+}
+
+async function getSavedBacktest(id) {
+  return withBacktestStore("readonly", (store) => store.get(id));
+}
+
+async function deleteSavedBacktest(id) {
+  return withBacktestStore("readwrite", (store) => store.delete(id));
+}
+
+async function refreshSavedBacktests() {
+  try {
+    state.savedBacktests = await listSavedBacktests();
+    renderSavedBacktests();
+  } catch (error) {
+    $("saved-backtests").innerHTML = `<div class="empty">Saved backtests unavailable: ${escapeHtml(error.message)}</div>`;
+  }
 }
 
 function startLiveReload() {
@@ -247,6 +310,8 @@ async function runBacktest() {
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || "Backtest failed.");
     state.result = data;
+    $("save-backtest").disabled = false;
+    $("save-name").value = defaultBacktestName();
     renderResult();
   } catch (error) {
     $("summary").innerHTML = `<span class="error">${escapeHtml(error.message)}</span>`;
@@ -255,6 +320,92 @@ async function runBacktest() {
     $("run").disabled = false;
     $("run").textContent = "Run Backtest";
   }
+}
+
+function currentBacktestConfig() {
+  return {
+    metrics: state.customMetrics,
+    conditions: state.conditions,
+    minRevenue: Number($("min-revenue").value || 0),
+  };
+}
+
+function defaultBacktestName() {
+  const condition = state.conditions[0];
+  const metric = condition?.metric || "Backtest";
+  const op = condition?.operator || "";
+  const value = condition?.value ?? "";
+  return `${metric} ${op} ${value}`.trim();
+}
+
+async function saveCurrentBacktest() {
+  if (!state.result) return;
+  const name = $("save-name").value.trim() || defaultBacktestName() || "Saved backtest";
+  const savedAt = new Date().toISOString();
+  const id = `${savedAt}-${Math.random().toString(16).slice(2)}`;
+  await putSavedBacktest({
+    id,
+    name,
+    savedAt,
+    config: currentBacktestConfig(),
+    result: state.result,
+  });
+  await refreshSavedBacktests();
+}
+
+async function handleSavedBacktestClick(event) {
+  const loadButton = event.target.closest("[data-load-backtest]");
+  if (loadButton) {
+    await loadSavedBacktest(loadButton.dataset.loadBacktest);
+    return;
+  }
+  const deleteButton = event.target.closest("[data-delete-backtest]");
+  if (deleteButton) {
+    await deleteSavedBacktest(deleteButton.dataset.deleteBacktest);
+    await refreshSavedBacktests();
+  }
+}
+
+async function loadSavedBacktest(id) {
+  const record = await getSavedBacktest(id);
+  if (!record) return;
+  state.customMetrics = record.config?.metrics || state.customMetrics;
+  state.conditions = record.config?.conditions || state.conditions;
+  $("min-revenue").value = record.config?.minRevenue ?? $("min-revenue").value;
+  state.result = record.result;
+  saveState();
+  renderCustomMetrics();
+  renderConditions();
+  $("save-backtest").disabled = false;
+  $("save-name").value = record.name;
+  renderResult();
+}
+
+function renderSavedBacktests() {
+  if (!state.savedBacktests.length) {
+    $("saved-backtests").innerHTML = '<div class="empty">No saved backtests yet.</div>';
+    return;
+  }
+  $("saved-backtests").innerHTML = state.savedBacktests
+    .map(
+      (record) => `
+        <div class="saved-item">
+          <div>
+            <strong>${escapeHtml(record.name)}</strong>
+            <span>${formatSavedDate(record.savedAt)} · ${formatNumber(record.result?.finalValue)} final · ${formatDuration(record.result?.elapsedSeconds)}</span>
+          </div>
+          <button class="ghost" data-load-backtest="${escapeAttr(record.id)}">Load</button>
+          <button class="icon" title="Delete saved backtest" data-delete-backtest="${escapeAttr(record.id)}">×</button>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+function formatSavedDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "saved";
+  return date.toLocaleString([], { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function renderResult() {

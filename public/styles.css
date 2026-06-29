@@ -238,6 +238,43 @@ label {
   margin-bottom: 16px;
 }
 
+.saved-panel {
+  margin-bottom: 16px;
+}
+
+.save-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.saved-list {
+  display: grid;
+  gap: 8px;
+}
+
+.saved-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 34px;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fbfcfb;
+}
+
+.saved-item strong,
+.saved-item span {
+  display: block;
+}
+
+.saved-item span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .stats {
   display: flex;
   gap: 8px;
@@ -382,7 +419,9 @@ th {
 
   .row,
   .condition-row,
-  .settings {
+  .settings,
+  .save-controls,
+  .saved-item {
     grid-template-columns: 1fr;
   }
 
