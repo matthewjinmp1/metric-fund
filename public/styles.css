@@ -283,7 +283,7 @@ canvas {
 
 .period-item {
   display: grid;
-  grid-template-columns: minmax(110px, 0.6fr) minmax(120px, 0.7fr) minmax(140px, 1fr);
+  grid-template-columns: minmax(90px, 0.5fr) minmax(110px, 0.6fr) minmax(120px, 0.7fr) minmax(140px, 1fr);
   gap: 4px 10px;
   align-items: baseline;
   min-height: 44px;

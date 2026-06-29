@@ -267,17 +267,28 @@ function renderResult() {
     <div class="stat"><strong>${formatDuration(result.elapsedSeconds)}</strong><span>backtest time</span></div>
   `;
   drawChart(result.series);
-  $("period-list").innerHTML = result.series
+  const yearlyItems = yearlyPeriodItems(result.series);
+  $("period-list").innerHTML = yearlyItems
     .map(
-      (item, index) =>
+      ({ item, index, year }) =>
         `<button class="period-item" type="button" data-period-index="${index}" aria-pressed="false">
-          <strong>${item.period}</strong>
+          <strong>${year}</strong>
+          <span>${item.period}</span>
           <span>${formatCount(item.holdings)} holdings</span>
           <span>${formatCount(item.available)} available</span>
         </button>`,
     )
     .join("");
   selectPeriod(Math.max(0, result.series.length - 1));
+}
+
+function yearlyPeriodItems(series) {
+  const byYear = new Map();
+  series.forEach((item, index) => {
+    const year = String(item.period).slice(0, 4);
+    byYear.set(year, { item, index, year });
+  });
+  return [...byYear.values()];
 }
 
 function handlePeriodClick(event) {
