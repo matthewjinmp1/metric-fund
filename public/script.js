@@ -418,17 +418,17 @@ function renderResult() {
     <div class="stat"><strong>${formatDuration(result.elapsedSeconds)}</strong><span>backtest time</span></div>
   `;
   drawChart(result.series);
-  const yearlyItems = yearlyPeriodItems(result.series);
+  const yearlyItems = yearlyPeriodItems(result);
   $("period-list").innerHTML = yearlyItems
     .map(
-      ({ item, index, year }) =>
+      ({ item, index, year, yearReturn }) =>
         `<div class="period-row">
           <button class="period-item" type="button" data-period-index="${index}" aria-pressed="false">
             <strong>${year}</strong>
             <span>${item.period}</span>
             <span>${formatCount(item.holdings)} holdings</span>
             <span>${formatCount(item.available)} available</span>
-            <span>${formatPct(item.return)} return</span>
+            <span>${formatPct(yearReturn)} year return</span>
           </button>
           <div class="detail inline-detail" data-period-detail-index="${index}"></div>
         </div>`,
@@ -437,11 +437,21 @@ function renderResult() {
   selectPeriod(Math.max(0, result.series.length - 1));
 }
 
-function yearlyPeriodItems(series) {
+function yearlyPeriodItems(result) {
   const byYear = new Map();
-  series.forEach((item, index) => {
+  let previousValue = result.startValue || 100;
+  result.series.forEach((item, index) => {
     const year = String(item.period).slice(0, 4);
-    byYear.set(year, { item, index, year });
+    const existing = byYear.get(year);
+    const startValue = existing?.startValue ?? previousValue;
+    byYear.set(year, {
+      item,
+      index,
+      year,
+      startValue,
+      yearReturn: item.value / startValue - 1,
+    });
+    previousValue = item.value;
   });
   return [...byYear.values()];
 }
