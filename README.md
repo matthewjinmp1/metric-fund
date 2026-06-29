@@ -30,10 +30,10 @@ FINANCIALS_DB=/path/to/financials.db ./start_server.sh
 
 ## Current Model
 
-- Quarterly equal-weight backtest
+- Rolling equal-weight completed-interval backtest
 - Formula metrics such as `net_income / total_assets`
 - Conditions such as `ROA > 0.10`
-- Uses `period_end_price` plus dividends for next-period returns
+- A stock enters when a qualifying financial datapoint appears, contributes its next `period_end_price` plus dividend return when the next datapoint arrives, and drops out when its data ends or no longer qualifies
 - Optional minimum revenue filter, defaulting to `$1B`
 
 This is an early prototype. It does not yet handle filing lags, liquidity constraints, delistings, survivorship bias, slippage, taxes, or transaction costs.

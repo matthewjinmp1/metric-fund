@@ -265,8 +265,7 @@ def build_backtest(payload):
     base_keys.update(["period_end_price", "dividends", "market_cap", "revenue"])
 
     rows = load_rows()
-    by_period = {}
-    all_periods = set()
+    by_exit_period = {}
     excluded = {
         "price": 0,
         "revenue": 0,
@@ -279,10 +278,10 @@ def build_backtest(payload):
             continue
         dividends = data.get("dividends") if isinstance(data.get("dividends"), list) else []
         for index, period in enumerate(row["periods"][:-1]):
+            next_period = row["periods"][index + 1] if index + 1 < len(row["periods"]) else None
             price = number_or_nan(get_value(data, "period_end_price", index))
             next_price = number_or_nan(get_value(data, "period_end_price", index + 1))
             dividend = number_or_nan(dividends[index + 1] if index + 1 < len(dividends) else 0)
-            all_periods.add(period)
             if not (is_number(price) and is_number(next_price)) or price <= 0 or next_price <= 0:
                 excluded["price"] += 1
                 continue
@@ -301,14 +300,17 @@ def build_backtest(payload):
             total_return = ((next_price + (dividend if is_number(dividend) else 0)) / price) - 1
             if not is_number(total_return):
                 continue
-            by_period.setdefault(period, []).append(
+            by_exit_period.setdefault(next_period, []).append(
                 {
                     "ticker": row["ticker"],
                     "companyName": row["company_name"],
                     "exchange": row["exchange"],
+                    "startPeriod": period,
+                    "endPeriod": next_period,
                     "return": total_return,
                     "metrics": metric_values,
                     "price": price,
+                    "nextPrice": next_price,
                     "marketCap": market_cap if is_number(market_cap) else None,
                     "revenue": revenue if is_number(revenue) else None,
                 }
@@ -316,9 +318,9 @@ def build_backtest(payload):
 
     value = START_VALUE
     series = []
-    periods = sorted(all_periods)
+    periods = sorted(by_exit_period.keys())
     for period in periods:
-        holdings = by_period.get(period, [])
+        holdings = by_exit_period.get(period, [])
         if max_holdings > 0:
             sort_metric = conditions[0]["metric"] if conditions else metrics[0]["name"]
             holdings = sorted(
@@ -353,9 +355,9 @@ def build_backtest(payload):
         "series": series,
         "excluded": excluded,
         "notes": [
-            "Quarterly equal-weight portfolio.",
-            "Signals use values at period t; returns use period_end_price t to t+1 plus next period dividend.",
-            "Periods with no qualifying holdings stay in cash.",
+            "Rolling equal-weight completed-interval portfolio.",
+            "A stock enters when a qualifying financial datapoint appears and contributes its next period_end_price return plus dividend when the next datapoint arrives.",
+            "Stocks drop out when their data ends or no longer qualifies at their next datapoint.",
             "No delisting, liquidity, slippage, survivorship, or filing-lag adjustments yet.",
         ],
     }

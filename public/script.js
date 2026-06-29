@@ -237,12 +237,11 @@ function renderResult() {
   $("stats").innerHTML = `
     <div class="stat"><strong>${formatNumber(result.finalValue)}</strong><span>final value</span></div>
     <div class="stat"><strong>${formatPct(result.totalReturn)}</strong><span>total return</span></div>
-    <div class="stat"><strong>${result.periods}</strong><span>quarters</span></div>
-    <div class="stat"><strong>${result.series.filter((item) => item.holdings === 0).length}</strong><span>cash quarters</span></div>
+    <div class="stat"><strong>${result.periods}</strong><span>updates</span></div>
   `;
   drawChart(result.series);
   $("period-select").innerHTML = result.series
-    .map((item, index) => `<option value="${index}">${item.period} · ${item.holdings} holdings</option>`)
+    .map((item, index) => `<option value="${index}">${item.period} · ${item.holdings} intervals</option>`)
     .join("");
   $("period-select").value = String(Math.max(0, result.series.length - 1));
   renderPeriodDetail();
@@ -323,12 +322,13 @@ function renderPeriodDetail() {
   const item = result.series[Number($("period-select").value || 0)];
   const rows = item.sample || [];
   $("period-detail").innerHTML = `
-    <p>${item.period}: ${item.holdings} holdings, next-quarter return ${formatPct(item.return)}${item.holdings === 0 ? " · cash" : ""}</p>
+    <p>${item.period}: ${item.holdings} completed intervals, average return ${formatPct(item.return)}</p>
     <table>
       <thead>
         <tr>
           <th>Ticker</th>
           <th>Company</th>
+          <th>Held</th>
           <th>Return</th>
           <th>Price</th>
           <th>Market Cap</th>
@@ -343,6 +343,7 @@ function renderPeriodDetail() {
               <tr>
                 <td>${escapeHtml(row.ticker)}</td>
                 <td>${escapeHtml(row.companyName || "")}</td>
+                <td>${escapeHtml(row.startPeriod)} to ${escapeHtml(row.endPeriod)}</td>
                 <td>${formatPct(row.return)}</td>
                 <td>${formatNumber(row.price)}</td>
                 <td>${formatNumber(row.marketCap)}</td>
