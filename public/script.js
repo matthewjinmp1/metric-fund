@@ -5,6 +5,16 @@ const state = {
   result: null,
 };
 
+const starterMetricRevisions = new Map(
+  [
+    ["ROA", "net_income / total_assets", "roa"],
+    ["ROE", "net_income / total_equity", "roe"],
+    ["FCF Margin", "fcf / revenue", "fcf_margin"],
+    ["Gross Margin", "gross_profit / revenue", "gross_margin"],
+    ["Debt / Assets", "(st_debt + lt_debt) / total_assets", "debt_to_assets"],
+  ].map(([name, oldFormula, newFormula]) => [`${name}:${oldFormula}`, newFormula]),
+);
+
 const $ = (id) => document.getElementById(id);
 
 function formatNumber(value, digits = 2) {
@@ -44,7 +54,12 @@ async function init() {
   const data = await res.json();
   state.baseMetrics = data.baseMetrics;
   if (!state.customMetrics.length) state.customMetrics = data.defaultMetrics;
+  state.customMetrics = state.customMetrics.map((metric) => {
+    const formula = starterMetricRevisions.get(`${metric.name}:${metric.formula}`);
+    return formula ? { ...metric, formula } : metric;
+  });
   if (!state.conditions.length) state.conditions = data.defaultConditions;
+  saveState();
   renderBaseMetrics();
   renderCustomMetrics();
   renderConditions();

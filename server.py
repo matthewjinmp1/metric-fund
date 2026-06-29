@@ -24,11 +24,11 @@ APP_STARTED_AT = time.time()
 
 
 DEFAULT_METRICS = [
-    {"name": "ROA", "formula": "net_income / total_assets"},
-    {"name": "ROE", "formula": "net_income / total_equity"},
-    {"name": "FCF Margin", "formula": "fcf / revenue"},
-    {"name": "Gross Margin", "formula": "gross_profit / revenue"},
-    {"name": "Debt / Assets", "formula": "(st_debt + lt_debt) / total_assets"},
+    {"name": "ROA", "formula": "roa"},
+    {"name": "ROE", "formula": "roe"},
+    {"name": "FCF Margin", "formula": "fcf_margin"},
+    {"name": "Gross Margin", "formula": "gross_margin"},
+    {"name": "Debt / Assets", "formula": "debt_to_assets"},
 ]
 
 

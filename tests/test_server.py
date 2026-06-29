@@ -162,6 +162,36 @@ class BacktestTests(unittest.TestCase):
         self.assertEqual(result["series"][2]["period"], "2020-09")
         self.assertAlmostEqual(result["finalValue"], 143.0)
 
+    def test_default_roa_uses_quickfs_ratio_instead_of_quarterly_income_over_assets(self):
+        temp, db_path = write_test_db(
+            [
+                {
+                    "ticker": "RATIO",
+                    "data": {
+                        "period_end_date": ["2020-03", "2020-06"],
+                        "roa": [0.2, 0.2],
+                        "roe": [0.3, 0.3],
+                        "fcf_margin": [0.1, 0.1],
+                        "gross_margin": [0.5, 0.5],
+                        "debt_to_assets": [0.2, 0.2],
+                        "net_income": [5, 5],
+                        "total_assets": [100, 100],
+                        "period_end_price": [10, 11],
+                        "revenue": [1_000_000_000, 1_100_000_000],
+                    },
+                }
+            ]
+        )
+        payload = {"minRevenue": 1_000_000_000}
+
+        with temp, patch.object(server, "DB_PATH", db_path):
+            result = server.build_backtest(payload)
+
+        self.assertEqual(result["metrics"][0], {"name": "ROA", "formula": "roa"})
+        self.assertEqual(result["series"][0]["holdings"], 1)
+        self.assertEqual(result["series"][0]["sample"][0]["ticker"], "RATIO")
+        self.assertAlmostEqual(result["finalValue"], 110)
+
     def test_backtest_rolls_staggered_company_dates_independently(self):
         temp, db_path = write_test_db(
             [
