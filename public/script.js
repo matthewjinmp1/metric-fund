@@ -26,6 +26,11 @@ function formatNumber(value, digits = 2) {
   return num.toFixed(digits);
 }
 
+function formatCount(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "0";
+  return Number(value).toLocaleString();
+}
+
 function formatPct(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
   return `${(Number(value) * 100).toFixed(1)}%`;
@@ -255,7 +260,10 @@ function renderResult() {
   `;
   drawChart(result.series);
   $("period-select").innerHTML = result.series
-    .map((item, index) => `<option value="${index}">${item.period} · ${item.holdings} holdings</option>`)
+    .map(
+      (item, index) =>
+        `<option value="${index}">${item.period} · ${formatCount(item.holdings)} holdings · ${formatCount(item.available)} available</option>`,
+    )
     .join("");
   $("period-select").value = String(Math.max(0, result.series.length - 1));
   renderPeriodDetail();
@@ -336,7 +344,7 @@ function renderPeriodDetail() {
   const item = result.series[Number($("period-select").value || 0)];
   const rows = item.sample || [];
   $("period-detail").innerHTML = `
-    <p>${item.period}: ${item.holdings} active holdings, ${item.completed || 0} completed returns applied, period return ${formatPct(item.return)}</p>
+    <p>${item.period}: ${formatCount(item.holdings)} active holdings from ${formatCount(item.available)} available stocks, ${formatCount(item.completed || 0)} completed returns applied, period return ${formatPct(item.return)}</p>
     <table>
       <thead>
         <tr>

@@ -265,6 +265,7 @@ def build_backtest(payload):
 
     rows = load_rows()
     by_exit_period = {}
+    available_intervals = []
     intervals = []
     snapshot_periods = set()
     excluded = {
@@ -286,6 +287,9 @@ def build_backtest(payload):
             if not (is_number(price) and is_number(next_price)) or price <= 0 or next_price <= 0:
                 excluded["price"] += 1
                 continue
+            available_intervals.append({"startPeriod": period, "endPeriod": next_period})
+            snapshot_periods.add(period)
+            snapshot_periods.add(next_period)
             revenue = number_or_nan(get_value(data, "revenue", index))
             if min_revenue and (not is_number(revenue) or revenue < min_revenue):
                 excluded["revenue"] += 1
@@ -315,8 +319,6 @@ def build_backtest(payload):
                 "revenue": revenue if is_number(revenue) else None,
             }
             intervals.append(interval)
-            snapshot_periods.add(period)
-            snapshot_periods.add(next_period)
             by_exit_period.setdefault(next_period, []).append(interval)
 
     value = START_VALUE
@@ -329,6 +331,11 @@ def build_backtest(payload):
             for interval in intervals
             if interval["startPeriod"] <= period < interval["endPeriod"]
         ]
+        available_count = sum(
+            1
+            for interval in available_intervals
+            if interval["startPeriod"] <= period < interval["endPeriod"]
+        )
         avg_return = sum(item["return"] for item in completed) / len(completed) if completed else 0
         value *= 1 + avg_return
         series.append(
@@ -337,6 +344,7 @@ def build_backtest(payload):
                 "value": value,
                 "return": avg_return,
                 "holdings": len(active_holdings),
+                "available": available_count,
                 "completed": len(completed),
                 "sample": active_holdings[:50],
                 "completedSample": completed[:20],

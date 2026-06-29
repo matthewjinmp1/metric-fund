@@ -150,9 +150,11 @@ class BacktestTests(unittest.TestCase):
 
         self.assertEqual(result["periods"], 3)
         self.assertEqual(result["series"][0]["period"], "2020-03")
+        self.assertEqual(result["series"][0]["available"], 2)
         self.assertEqual(result["series"][0]["sample"][0]["ticker"], "AAA")
         self.assertEqual(result["series"][0]["completed"], 0)
         self.assertEqual(result["series"][1]["period"], "2020-06")
+        self.assertEqual(result["series"][1]["available"], 2)
         self.assertEqual(result["series"][1]["completed"], 1)
         self.assertEqual(result["series"][1]["completedSample"][0]["ticker"], "AAA")
         self.assertEqual(result["series"][1]["completedSample"][0]["startPeriod"], "2020-03")
@@ -262,8 +264,10 @@ class BacktestTests(unittest.TestCase):
             result = server.build_backtest(payload)
 
         self.assertEqual(result["series"][0]["period"], "2020-03")
+        self.assertEqual(result["series"][0]["available"], 1)
         self.assertEqual(result["series"][0]["sample"][0]["ticker"], "OLD")
         self.assertEqual(result["series"][1]["period"], "2020-06")
+        self.assertEqual(result["series"][1]["available"], 1)
         self.assertEqual(result["series"][1]["completedSample"][0]["ticker"], "OLD")
         self.assertEqual(result["series"][1]["sample"][0]["ticker"], "ACTIVE")
         self.assertEqual(result["series"][1]["holdings"], 1)
