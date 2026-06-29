@@ -148,15 +148,18 @@ class BacktestTests(unittest.TestCase):
         with temp, patch.object(server, "DB_PATH", db_path):
             result = server.build_backtest(payload)
 
-        self.assertEqual(result["periods"], 2)
-        self.assertEqual(result["series"][0]["period"], "2020-06")
-        self.assertEqual(result["series"][0]["holdings"], 1)
+        self.assertEqual(result["periods"], 3)
+        self.assertEqual(result["series"][0]["period"], "2020-03")
         self.assertEqual(result["series"][0]["sample"][0]["ticker"], "AAA")
-        self.assertEqual(result["series"][0]["sample"][0]["startPeriod"], "2020-03")
-        self.assertEqual(result["series"][0]["sample"][0]["endPeriod"], "2020-06")
-        self.assertAlmostEqual(result["series"][0]["return"], 0.3)
-        self.assertEqual(result["series"][1]["sample"][0]["ticker"], "BBB")
-        self.assertEqual(result["series"][1]["period"], "2020-09")
+        self.assertEqual(result["series"][0]["completed"], 0)
+        self.assertEqual(result["series"][1]["period"], "2020-06")
+        self.assertEqual(result["series"][1]["completed"], 1)
+        self.assertEqual(result["series"][1]["completedSample"][0]["ticker"], "AAA")
+        self.assertEqual(result["series"][1]["completedSample"][0]["startPeriod"], "2020-03")
+        self.assertEqual(result["series"][1]["completedSample"][0]["endPeriod"], "2020-06")
+        self.assertAlmostEqual(result["series"][1]["return"], 0.3)
+        self.assertEqual(result["series"][2]["completedSample"][0]["ticker"], "BBB")
+        self.assertEqual(result["series"][2]["period"], "2020-09")
         self.assertAlmostEqual(result["finalValue"], 143.0)
 
     def test_backtest_rolls_staggered_company_dates_independently(self):
@@ -190,15 +193,18 @@ class BacktestTests(unittest.TestCase):
         with temp, patch.object(server, "DB_PATH", db_path):
             result = server.build_backtest(payload)
 
-        self.assertEqual([point["period"] for point in result["series"]], ["2020-06", "2020-07"])
-        self.assertEqual([point["sample"][0]["ticker"] for point in result["series"]], ["MAR", "APR"])
+        self.assertEqual([point["period"] for point in result["series"]], ["2020-03", "2020-04", "2020-06", "2020-07"])
+        self.assertEqual(result["series"][0]["sample"][0]["ticker"], "MAR")
+        self.assertEqual({row["ticker"] for row in result["series"][1]["sample"]}, {"MAR", "APR"})
+        self.assertEqual(result["series"][2]["completedSample"][0]["ticker"], "MAR")
+        self.assertEqual(result["series"][3]["completedSample"][0]["ticker"], "APR")
         self.assertAlmostEqual(result["finalValue"], 121.0)
 
-    def test_backtest_max_holdings_keeps_highest_condition_metric(self):
+    def test_backtest_series_shows_active_holdings_snapshot(self):
         temp, db_path = write_test_db(
             [
                 {
-                    "ticker": "LOW",
+                    "ticker": "OLD",
                     "data": {
                         "period_end_date": ["2020-03", "2020-06"],
                         "net_income": [20, 20],
@@ -207,12 +213,12 @@ class BacktestTests(unittest.TestCase):
                     },
                 },
                 {
-                    "ticker": "HIGH",
+                    "ticker": "ACTIVE",
                     "data": {
-                        "period_end_date": ["2020-03", "2020-06"],
-                        "net_income": [40, 40],
+                        "period_end_date": ["2020-06", "2020-09"],
+                        "net_income": [30, 30],
                         "total_assets": [100, 100],
-                        "period_end_price": [10, 15],
+                        "period_end_price": [20, 22],
                     },
                 },
             ]
@@ -220,15 +226,17 @@ class BacktestTests(unittest.TestCase):
         payload = {
             "metrics": [{"name": "ROA", "formula": "net_income / total_assets"}],
             "conditions": [{"metric": "ROA", "operator": ">", "value": 0.1}],
-            "maxHoldings": 1,
         }
 
         with temp, patch.object(server, "DB_PATH", db_path):
             result = server.build_backtest(payload)
 
-        self.assertEqual(result["series"][0]["holdings"], 1)
-        self.assertEqual(result["series"][0]["sample"][0]["ticker"], "HIGH")
-        self.assertAlmostEqual(result["finalValue"], 150.0)
+        self.assertEqual(result["series"][0]["period"], "2020-03")
+        self.assertEqual(result["series"][0]["sample"][0]["ticker"], "OLD")
+        self.assertEqual(result["series"][1]["period"], "2020-06")
+        self.assertEqual(result["series"][1]["completedSample"][0]["ticker"], "OLD")
+        self.assertEqual(result["series"][1]["sample"][0]["ticker"], "ACTIVE")
+        self.assertEqual(result["series"][1]["holdings"], 1)
 
     def test_backtest_applies_minimum_revenue_filter(self):
         temp, db_path = write_test_db(

@@ -256,7 +256,6 @@ def passes_conditions(values, conditions):
 def build_backtest(payload):
     user_metrics = payload.get("metrics") or DEFAULT_METRICS
     conditions = payload.get("conditions") or [{"metric": "ROA", "operator": ">", "value": 0.1}]
-    max_holdings = int(payload.get("maxHoldings") or 0)
     min_revenue = float(payload.get("minRevenue") or 0)
     metrics = compile_metrics(user_metrics)
     base_keys = set()
@@ -266,6 +265,8 @@ def build_backtest(payload):
 
     rows = load_rows()
     by_exit_period = {}
+    intervals = []
+    snapshot_periods = set()
     excluded = {
         "price": 0,
         "revenue": 0,
@@ -300,43 +301,45 @@ def build_backtest(payload):
             total_return = ((next_price + (dividend if is_number(dividend) else 0)) / price) - 1
             if not is_number(total_return):
                 continue
-            by_exit_period.setdefault(next_period, []).append(
-                {
-                    "ticker": row["ticker"],
-                    "companyName": row["company_name"],
-                    "exchange": row["exchange"],
-                    "startPeriod": period,
-                    "endPeriod": next_period,
-                    "return": total_return,
-                    "metrics": metric_values,
-                    "price": price,
-                    "nextPrice": next_price,
-                    "marketCap": market_cap if is_number(market_cap) else None,
-                    "revenue": revenue if is_number(revenue) else None,
-                }
-            )
+            interval = {
+                "ticker": row["ticker"],
+                "companyName": row["company_name"],
+                "exchange": row["exchange"],
+                "startPeriod": period,
+                "endPeriod": next_period,
+                "return": total_return,
+                "metrics": metric_values,
+                "price": price,
+                "nextPrice": next_price,
+                "marketCap": market_cap if is_number(market_cap) else None,
+                "revenue": revenue if is_number(revenue) else None,
+            }
+            intervals.append(interval)
+            snapshot_periods.add(period)
+            snapshot_periods.add(next_period)
+            by_exit_period.setdefault(next_period, []).append(interval)
 
     value = START_VALUE
     series = []
-    periods = sorted(by_exit_period.keys())
+    periods = sorted(snapshot_periods)
     for period in periods:
-        holdings = by_exit_period.get(period, [])
-        if max_holdings > 0:
-            sort_metric = conditions[0]["metric"] if conditions else metrics[0]["name"]
-            holdings = sorted(
-                holdings,
-                key=lambda item: number_or_nan(item["metrics"].get(sort_metric)),
-                reverse=True,
-            )[:max_holdings]
-        avg_return = sum(item["return"] for item in holdings) / len(holdings) if holdings else 0
+        completed = by_exit_period.get(period, [])
+        active_holdings = [
+            interval
+            for interval in intervals
+            if interval["startPeriod"] <= period < interval["endPeriod"]
+        ]
+        avg_return = sum(item["return"] for item in completed) / len(completed) if completed else 0
         value *= 1 + avg_return
         series.append(
             {
                 "period": period,
                 "value": value,
                 "return": avg_return,
-                "holdings": len(holdings),
-                "sample": holdings[:20],
+                "holdings": len(active_holdings),
+                "completed": len(completed),
+                "sample": active_holdings[:50],
+                "completedSample": completed[:20],
             }
         )
 
@@ -346,7 +349,6 @@ def build_backtest(payload):
         "conditions": conditions,
         "filters": {
             "minRevenue": min_revenue,
-            "maxHoldings": max_holdings,
         },
         "startValue": START_VALUE,
         "finalValue": value if series else START_VALUE,
@@ -357,7 +359,7 @@ def build_backtest(payload):
         "notes": [
             "Rolling equal-weight completed-interval portfolio.",
             "A stock enters when a qualifying financial datapoint appears and contributes its next period_end_price return plus dividend when the next datapoint arrives.",
-            "Stocks drop out when their data ends or no longer qualifies at their next datapoint.",
+            "The detail table shows active holdings as of the selected period; completed returns are averaged into the fund value when each next datapoint arrives.",
             "No delisting, liquidity, slippage, survivorship, or filing-lag adjustments yet.",
         ],
     }

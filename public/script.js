@@ -214,7 +214,6 @@ async function runBacktest() {
       body: JSON.stringify({
         metrics: state.customMetrics,
         conditions: state.conditions,
-        maxHoldings: Number($("max-holdings").value || 0),
         minRevenue: Number($("min-revenue").value || 0),
       }),
     });
@@ -237,11 +236,11 @@ function renderResult() {
   $("stats").innerHTML = `
     <div class="stat"><strong>${formatNumber(result.finalValue)}</strong><span>final value</span></div>
     <div class="stat"><strong>${formatPct(result.totalReturn)}</strong><span>total return</span></div>
-    <div class="stat"><strong>${result.periods}</strong><span>updates</span></div>
+    <div class="stat"><strong>${result.periods}</strong><span>periods</span></div>
   `;
   drawChart(result.series);
   $("period-select").innerHTML = result.series
-    .map((item, index) => `<option value="${index}">${item.period} · ${item.holdings} intervals</option>`)
+    .map((item, index) => `<option value="${index}">${item.period} · ${item.holdings} holdings</option>`)
     .join("");
   $("period-select").value = String(Math.max(0, result.series.length - 1));
   renderPeriodDetail();
@@ -322,13 +321,13 @@ function renderPeriodDetail() {
   const item = result.series[Number($("period-select").value || 0)];
   const rows = item.sample || [];
   $("period-detail").innerHTML = `
-    <p>${item.period}: ${item.holdings} completed intervals, average return ${formatPct(item.return)}</p>
+    <p>${item.period}: ${item.holdings} active holdings, ${item.completed || 0} completed returns applied, period return ${formatPct(item.return)}</p>
     <table>
       <thead>
         <tr>
           <th>Ticker</th>
           <th>Company</th>
-          <th>Held</th>
+          <th>Holding Period</th>
           <th>Return</th>
           <th>Price</th>
           <th>Market Cap</th>
