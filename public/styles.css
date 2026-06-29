@@ -318,6 +318,11 @@ canvas {
   border-bottom: 1px solid var(--line);
 }
 
+.period-row {
+  display: grid;
+  gap: 8px;
+}
+
 .period-item {
   display: grid;
   grid-template-columns: minmax(90px, 0.5fr) minmax(110px, 0.6fr) minmax(120px, 0.7fr) minmax(140px, 1fr);
@@ -354,6 +359,18 @@ canvas {
 .detail {
   min-height: 160px;
   overflow: auto;
+}
+
+.inline-detail:empty {
+  display: none;
+}
+
+.inline-detail {
+  min-height: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fbfcfb;
 }
 
 table {

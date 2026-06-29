@@ -296,7 +296,7 @@ async function runBacktest() {
   $("run").disabled = true;
   $("run").textContent = "Running...";
   $("summary").textContent = "Scanning financials and building portfolio history...";
-  $("period-detail").innerHTML = "";
+  clearPeriodDetails();
   try {
     const res = await fetch("/api/backtest", {
       method: "POST",
@@ -422,12 +422,15 @@ function renderResult() {
   $("period-list").innerHTML = yearlyItems
     .map(
       ({ item, index, year }) =>
-        `<button class="period-item" type="button" data-period-index="${index}" aria-pressed="false">
-          <strong>${year}</strong>
-          <span>${item.period}</span>
-          <span>${formatCount(item.holdings)} holdings</span>
-          <span>${formatCount(item.available)} available</span>
-        </button>`,
+        `<div class="period-row">
+          <button class="period-item" type="button" data-period-index="${index}" aria-pressed="false">
+            <strong>${year}</strong>
+            <span>${item.period}</span>
+            <span>${formatCount(item.holdings)} holdings</span>
+            <span>${formatCount(item.available)} available</span>
+          </button>
+          <div class="detail inline-detail" data-period-detail-index="${index}"></div>
+        </div>`,
     )
     .join("");
   selectPeriod(Math.max(0, result.series.length - 1));
@@ -461,6 +464,12 @@ function selectPeriod(index) {
     button.setAttribute("aria-pressed", String(isSelected));
   });
   renderPeriodDetail(nextIndex);
+}
+
+function clearPeriodDetails() {
+  document.querySelectorAll("[data-period-detail-index]").forEach((detail) => {
+    detail.innerHTML = "";
+  });
 }
 
 function drawChart(series) {
@@ -532,12 +541,20 @@ function drawChart(series) {
 function renderPeriodDetail(index) {
   const result = state.result;
   if (!result?.series?.length || index === null) {
-    $("period-detail").innerHTML = '<div class="empty">No period selected.</div>';
+    clearPeriodDetails();
     return;
   }
+  clearPeriodDetails();
+  const target = document.querySelector(`[data-period-detail-index="${index}"]`);
+  if (!target) return;
+  target.innerHTML = periodDetailHtml(index);
+}
+
+function periodDetailHtml(index) {
+  const result = state.result;
   const item = result.series[index];
   const rows = item.sample || [];
-  $("period-detail").innerHTML = `
+  return `
     <p>${item.period}: ${formatCount(item.holdings)} active holdings from ${formatCount(item.available)} available stocks, ${formatCount(item.completed || 0)} completed returns applied, period return ${formatPct(item.return)}</p>
     <table>
       <thead>
