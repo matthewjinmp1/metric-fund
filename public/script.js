@@ -79,7 +79,7 @@ async function init() {
   $("add-metric").addEventListener("click", addMetric);
   $("add-condition").addEventListener("click", addCondition);
   $("metric-search").addEventListener("input", renderBaseMetrics);
-  $("period-select").addEventListener("change", renderPeriodDetail);
+  $("period-list").addEventListener("click", handlePeriodClick);
 }
 
 function startLiveReload() {
@@ -267,14 +267,38 @@ function renderResult() {
     <div class="stat"><strong>${formatDuration(result.elapsedSeconds)}</strong><span>backtest time</span></div>
   `;
   drawChart(result.series);
-  $("period-select").innerHTML = result.series
+  $("period-list").innerHTML = result.series
     .map(
       (item, index) =>
-        `<option value="${index}">${item.period} · ${formatCount(item.holdings)} holdings · ${formatCount(item.available)} available</option>`,
+        `<button class="period-item" type="button" data-period-index="${index}" aria-pressed="false">
+          <strong>${item.period}</strong>
+          <span>${formatCount(item.holdings)} holdings</span>
+          <span>${formatCount(item.available)} available</span>
+        </button>`,
     )
     .join("");
-  $("period-select").value = String(Math.max(0, result.series.length - 1));
-  renderPeriodDetail();
+  selectPeriod(Math.max(0, result.series.length - 1));
+}
+
+function handlePeriodClick(event) {
+  const button = event.target.closest("[data-period-index]");
+  if (!button) return;
+  selectPeriod(Number(button.dataset.periodIndex || 0));
+}
+
+function selectPeriod(index) {
+  const result = state.result;
+  if (!result?.series?.length) {
+    renderPeriodDetail(null);
+    return;
+  }
+  const nextIndex = Math.max(0, Math.min(index, result.series.length - 1));
+  document.querySelectorAll(".period-item").forEach((button) => {
+    const isSelected = Number(button.dataset.periodIndex) === nextIndex;
+    button.classList.toggle("selected", isSelected);
+    button.setAttribute("aria-pressed", String(isSelected));
+  });
+  renderPeriodDetail(nextIndex);
 }
 
 function drawChart(series) {
@@ -343,13 +367,13 @@ function drawChart(series) {
   ctx.textAlign = "left";
 }
 
-function renderPeriodDetail() {
+function renderPeriodDetail(index) {
   const result = state.result;
-  if (!result?.series?.length) {
+  if (!result?.series?.length || index === null) {
     $("period-detail").innerHTML = '<div class="empty">No period selected.</div>';
     return;
   }
-  const item = result.series[Number($("period-select").value || 0)];
+  const item = result.series[index];
   const rows = item.sample || [];
   $("period-detail").innerHTML = `
     <p>${item.period}: ${formatCount(item.holdings)} active holdings from ${formatCount(item.available)} available stocks, ${formatCount(item.completed || 0)} completed returns applied, period return ${formatPct(item.return)}</p>
