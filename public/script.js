@@ -36,6 +36,13 @@ function formatPct(value) {
   return `${(Number(value) * 100).toFixed(1)}%`;
 }
 
+function formatDuration(seconds) {
+  if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) return "-";
+  const value = Number(seconds);
+  if (value < 1) return `${Math.round(value * 1000)}ms`;
+  return `${value.toFixed(2)}s`;
+}
+
 function loadSaved() {
   const saved = JSON.parse(localStorage.getItem("metricFundState") || "{}");
   state.customMetrics = saved.customMetrics || [];
@@ -257,6 +264,7 @@ function renderResult() {
     <div class="stat"><strong>${formatNumber(result.finalValue)}</strong><span>final value</span></div>
     <div class="stat"><strong>${formatPct(result.totalReturn)}</strong><span>total return</span></div>
     <div class="stat"><strong>${result.periods}</strong><span>periods</span></div>
+    <div class="stat"><strong>${formatDuration(result.elapsedSeconds)}</strong><span>backtest time</span></div>
   `;
   drawChart(result.series);
   $("period-select").innerHTML = result.series

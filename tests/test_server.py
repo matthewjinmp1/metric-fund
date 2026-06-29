@@ -149,6 +149,7 @@ class BacktestTests(unittest.TestCase):
             result = server.build_backtest(payload)
 
         self.assertEqual(result["periods"], 3)
+        self.assertGreaterEqual(result["elapsedSeconds"], 0)
         self.assertEqual(result["series"][0]["period"], "2020-03")
         self.assertEqual(result["series"][0]["available"], 2)
         self.assertEqual(result["series"][0]["sample"][0]["ticker"], "AAA")

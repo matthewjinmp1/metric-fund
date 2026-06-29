@@ -254,6 +254,7 @@ def passes_conditions(values, conditions):
 
 
 def build_backtest(payload):
+    started_at = time.perf_counter()
     user_metrics = payload.get("metrics") or DEFAULT_METRICS
     conditions = payload.get("conditions") or [{"metric": "ROA", "operator": ">", "value": 0.1}]
     min_revenue = float(payload.get("minRevenue") or 0)
@@ -362,6 +363,7 @@ def build_backtest(payload):
         "finalValue": value if series else START_VALUE,
         "totalReturn": (value / START_VALUE - 1) if series else 0,
         "periods": len(series),
+        "elapsedSeconds": time.perf_counter() - started_at,
         "series": series,
         "excluded": excluded,
         "notes": [
