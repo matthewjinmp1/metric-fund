@@ -8,7 +8,7 @@ A local web app for building simple fundamentals-based fund backtests from a Qui
 ./start_server.sh
 ```
 
-Then open `http://127.0.0.1:8000`.
+Then open `http://127.0.0.1:3002`.
 
 The dev server auto-restarts when Python or public web files change, and the browser refreshes itself after source changes. To run without auto-reload:
 

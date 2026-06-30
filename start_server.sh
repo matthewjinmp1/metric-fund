@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PORT="${PORT:-8000}"
+PORT="${PORT:-3002}"
 FINANCIALS_DB="${FINANCIALS_DB:-/Users/matthewjohnson/Downloads/stock_analysis/AI_stock_scorer/data/financials.db}"
 
 export PORT
