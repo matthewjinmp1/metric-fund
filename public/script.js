@@ -4,6 +4,7 @@ const state = {
   conditions: [],
   result: null,
   savedBacktests: [],
+  selectedPeriodIndex: null,
 };
 
 const starterMetricRevisions = new Map(
@@ -274,6 +275,7 @@ async function runBacktest() {
   $("run").disabled = true;
   $("run").textContent = "Running...";
   $("summary").textContent = "Scanning financials and building portfolio history...";
+  state.selectedPeriodIndex = null;
   clearPeriodDetails();
   try {
     const res = await fetch("/api/backtest", {
@@ -437,16 +439,23 @@ function yearlyPeriodItems(result) {
 function handlePeriodClick(event) {
   const button = event.target.closest("[data-period-index]");
   if (!button) return;
-  selectPeriod(Number(button.dataset.periodIndex || 0));
+  const index = Number(button.dataset.periodIndex || 0);
+  selectPeriod(state.selectedPeriodIndex === index ? null : index);
 }
 
 function selectPeriod(index) {
   const result = state.result;
-  if (!result?.series?.length) {
+  if (!result?.series?.length || index === null) {
+    state.selectedPeriodIndex = null;
+    document.querySelectorAll(".period-item").forEach((button) => {
+      button.classList.remove("selected");
+      button.setAttribute("aria-pressed", "false");
+    });
     renderPeriodDetail(null);
     return;
   }
   const nextIndex = Math.max(0, Math.min(index, result.series.length - 1));
+  state.selectedPeriodIndex = nextIndex;
   document.querySelectorAll(".period-item").forEach((button) => {
     const isSelected = Number(button.dataset.periodIndex) === nextIndex;
     button.classList.toggle("selected", isSelected);
