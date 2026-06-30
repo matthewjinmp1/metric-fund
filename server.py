@@ -6,9 +6,10 @@ import mimetypes
 import os
 import sqlite3
 import time
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 
 ROOT = Path(__file__).resolve().parent
@@ -21,6 +22,9 @@ DB_PATH = Path(
 )
 START_VALUE = 100.0
 APP_STARTED_AT = time.time()
+SAVED_BACKTESTS_PATH = Path(
+    os.environ.get("SAVED_BACKTESTS_PATH", ROOT / "data" / "saved_backtests.json")
+)
 
 
 DEFAULT_METRICS = [
@@ -153,6 +157,88 @@ def source_files():
 def app_version():
     latest_mtime = max((path.stat().st_mtime for path in source_files()), default=APP_STARTED_AT)
     return f"{latest_mtime:.6f}"
+
+
+
+
+
+def read_saved_backtests():
+    if not SAVED_BACKTESTS_PATH.exists():
+        return []
+    try:
+        data = json.loads(SAVED_BACKTESTS_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        raise ValueError(f"Saved backtests file is invalid JSON: {SAVED_BACKTESTS_PATH}")
+    if not isinstance(data, list):
+        raise ValueError("Saved backtests file must contain a list.")
+    return data
+
+
+def write_saved_backtests(records):
+    SAVED_BACKTESTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = SAVED_BACKTESTS_PATH.with_suffix(".tmp")
+    tmp_path.write_text(json.dumps(json_safe(records), indent=2, allow_nan=False), encoding="utf-8")
+    tmp_path.replace(SAVED_BACKTESTS_PATH)
+
+
+def public_saved_backtest(record, include_result=False):
+    public = {
+        "id": record.get("id"),
+        "name": record.get("name"),
+        "savedAt": record.get("savedAt"),
+        "config": record.get("config"),
+    }
+    result = record.get("result") if isinstance(record, dict) else None
+    if include_result:
+        public["result"] = result
+    else:
+        public["resultSummary"] = {
+            "finalValue": result.get("finalValue") if isinstance(result, dict) else None,
+            "elapsedSeconds": result.get("elapsedSeconds") if isinstance(result, dict) else None,
+            "periods": result.get("periods") if isinstance(result, dict) else None,
+        }
+    return public
+
+
+def list_saved_backtests():
+    records = read_saved_backtests()
+    return sorted(
+        [public_saved_backtest(record) for record in records if isinstance(record, dict)],
+        key=lambda record: str(record.get("savedAt") or ""),
+        reverse=True,
+    )
+
+
+def get_saved_backtest(record_id):
+    for record in read_saved_backtests():
+        if isinstance(record, dict) and record.get("id") == record_id:
+            return public_saved_backtest(record, include_result=True)
+    return None
+
+
+def save_backtest_record(payload):
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    record = {
+        "id": str(payload.get("id") or uuid.uuid4()),
+        "name": str(payload.get("name") or "Saved backtest").strip() or "Saved backtest",
+        "savedAt": str(payload.get("savedAt") or now),
+        "config": payload.get("config") or {},
+        "result": payload.get("result") or {},
+    }
+    records = [item for item in read_saved_backtests() if isinstance(item, dict) and item.get("id") != record["id"]]
+    records.append(record)
+    records.sort(key=lambda item: str(item.get("savedAt") or ""), reverse=True)
+    write_saved_backtests(records)
+    return public_saved_backtest(record, include_result=True)
+
+
+def delete_saved_backtest(record_id):
+    records = read_saved_backtests()
+    remaining = [record for record in records if not (isinstance(record, dict) and record.get("id") == record_id)]
+    if len(remaining) == len(records):
+        return False
+    write_saved_backtests(remaining)
+    return True
 
 
 def load_rows():
@@ -384,19 +470,44 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/version":
             self.send_json({"version": app_version(), "startedAt": APP_STARTED_AT})
             return
+        if parsed.path == "/api/saved-backtests":
+            self.send_json({"backtests": list_saved_backtests()})
+            return
+        if parsed.path.startswith("/api/saved-backtests/"):
+            record = get_saved_backtest(unquote(parsed.path.rsplit("/", 1)[-1]))
+            if record:
+                self.send_json(record)
+            else:
+                self.send_json({"error": "Saved backtest not found."}, status=404)
+            return
         path = parsed.path.lstrip("/") or "index.html"
         self.serve_static(path)
 
     def do_POST(self):
-        if urlparse(self.path).path != "/api/backtest":
-            self.send_error(404)
-            return
+        path = urlparse(self.path).path
         try:
             length = int(self.headers.get("content-length", "0"))
             payload = json.loads(self.rfile.read(length) or b"{}")
-            self.send_json(build_backtest(payload))
+            if path == "/api/backtest":
+                self.send_json(build_backtest(payload))
+                return
+            if path == "/api/saved-backtests":
+                self.send_json(save_backtest_record(payload), status=201)
+                return
+            self.send_error(404)
         except Exception as exc:
             self.send_json({"error": str(exc)}, status=400)
+
+    def do_DELETE(self):
+        path = urlparse(self.path).path
+        if not path.startswith("/api/saved-backtests/"):
+            self.send_error(404)
+            return
+        record_id = unquote(path.rsplit("/", 1)[-1])
+        if delete_saved_backtest(record_id):
+            self.send_json({"deleted": True})
+        else:
+            self.send_json({"error": "Saved backtest not found."}, status=404)
 
     def handle_metrics(self):
         keys, examples = metric_catalog(limit=8)

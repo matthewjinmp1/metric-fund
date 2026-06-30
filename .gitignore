@@ -4,3 +4,5 @@ __pycache__/
 .env
 .venv/
 venv/
+data/saved_backtests.json
+data/saved_backtests.tmp

@@ -312,6 +312,46 @@ class BacktestTests(unittest.TestCase):
         self.assertAlmostEqual(result["finalValue"], 110)
         self.assertEqual(result["excluded"]["revenue"], 1)
 
+
+class SavedBacktestTests(unittest.TestCase):
+    def test_saved_backtests_round_trip_to_json_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store_path = Path(tmp) / "saved_backtests.json"
+            with patch.object(server, "SAVED_BACKTESTS_PATH", store_path):
+                saved = server.save_backtest_record(
+                    {
+                        "id": "2026-01-01T00:00:00Z:test",
+                        "name": "ROA screen",
+                        "savedAt": "2026-01-01T00:00:00Z",
+                        "config": {"minRevenue": 1_000_000_000},
+                        "result": {"finalValue": 123.45, "elapsedSeconds": 1.2, "series": [{"period": "2025-12"}]},
+                    }
+                )
+
+                self.assertTrue(store_path.exists())
+                self.assertEqual(saved["result"]["finalValue"], 123.45)
+                listed = server.list_saved_backtests()
+                self.assertEqual(len(listed), 1)
+                self.assertEqual(listed[0]["resultSummary"], {"finalValue": 123.45, "elapsedSeconds": 1.2, "periods": None})
+                self.assertNotIn("result", listed[0])
+                loaded = server.get_saved_backtest("2026-01-01T00:00:00Z:test")
+                self.assertEqual(loaded["result"]["series"][0]["period"], "2025-12")
+                self.assertTrue(server.delete_saved_backtest("2026-01-01T00:00:00Z:test"))
+                self.assertEqual(server.list_saved_backtests(), [])
+                self.assertFalse(server.delete_saved_backtest("missing"))
+
+    def test_saved_backtest_replaces_existing_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store_path = Path(tmp) / "saved_backtests.json"
+            with patch.object(server, "SAVED_BACKTESTS_PATH", store_path):
+                server.save_backtest_record({"id": "same", "name": "Old", "savedAt": "2026-01-01T00:00:00Z"})
+                server.save_backtest_record({"id": "same", "name": "New", "savedAt": "2026-01-02T00:00:00Z"})
+
+                listed = server.list_saved_backtests()
+                self.assertEqual(len(listed), 1)
+                self.assertEqual(listed[0]["name"], "New")
+
+
 class VersionTests(unittest.TestCase):
     def test_app_version_reflects_latest_source_mtime(self):
         with tempfile.TemporaryDirectory() as tmp:

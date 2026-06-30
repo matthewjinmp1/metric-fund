@@ -42,3 +42,5 @@ uses a single quarter of net income against a balance-sheet value, which makes a
 threshold far stricter than an annual ROA screen.
 
 This is an early prototype. It does not yet handle filing lags, liquidity constraints, delistings, survivorship bias, slippage, taxes, or transaction costs.
+
+Saved backtests are stored server-side in `data/saved_backtests.json` and can be reloaded without recalculating.

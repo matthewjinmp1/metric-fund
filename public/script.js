@@ -6,9 +6,6 @@ const state = {
   savedBacktests: [],
 };
 
-const BACKTEST_DB = "metricFundBacktests";
-const BACKTEST_STORE = "backtests";
-
 const starterMetricRevisions = new Map(
   [
     ["ROA", "net_income / total_assets", "roa"],
@@ -89,51 +86,32 @@ async function init() {
   await refreshSavedBacktests();
 }
 
-function openBacktestDb() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(BACKTEST_DB, 1);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(BACKTEST_STORE)) {
-        db.createObjectStore(BACKTEST_STORE, { keyPath: "id" });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function withBacktestStore(mode, callback) {
-  const db = await openBacktestDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(BACKTEST_STORE, mode);
-    const store = tx.objectStore(BACKTEST_STORE);
-    const request = callback(store);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-    tx.oncomplete = () => db.close();
-    tx.onerror = () => {
-      db.close();
-      reject(tx.error);
-    };
-  });
+async function requestJson(url, options = {}) {
+  const res = await fetch(url, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed: ${res.status}`);
+  return data;
 }
 
 async function listSavedBacktests() {
-  const rows = await withBacktestStore("readonly", (store) => store.getAll());
-  return rows.sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)));
+  const data = await requestJson("/api/saved-backtests");
+  return data.backtests || [];
 }
 
 async function putSavedBacktest(record) {
-  return withBacktestStore("readwrite", (store) => store.put(record));
+  return requestJson("/api/saved-backtests", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(record),
+  });
 }
 
 async function getSavedBacktest(id) {
-  return withBacktestStore("readonly", (store) => store.get(id));
+  return requestJson(`/api/saved-backtests/${encodeURIComponent(id)}`);
 }
 
 async function deleteSavedBacktest(id) {
-  return withBacktestStore("readwrite", (store) => store.delete(id));
+  return requestJson(`/api/saved-backtests/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 async function refreshSavedBacktests() {
@@ -392,7 +370,7 @@ function renderSavedBacktests() {
         <div class="saved-item">
           <div>
             <strong>${escapeHtml(record.name)}</strong>
-            <span>${formatSavedDate(record.savedAt)} · ${formatNumber(record.result?.finalValue)} final · ${formatDuration(record.result?.elapsedSeconds)}</span>
+            <span>${formatSavedDate(record.savedAt)} · ${formatNumber(record.resultSummary?.finalValue)} final · ${formatDuration(record.resultSummary?.elapsedSeconds)}</span>
           </div>
           <button class="ghost" data-load-backtest="${escapeAttr(record.id)}">Load</button>
           <button class="icon" title="Delete saved backtest" data-delete-backtest="${escapeAttr(record.id)}">×</button>
