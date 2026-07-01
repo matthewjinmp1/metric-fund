@@ -893,8 +893,8 @@ function periodDetailHtml(index) {
   const yearlyItem = yearlyItemForPeriodIndex(index);
   const rows = yearlyItem?.rows || item.sample || [];
   const heading = yearlyItem
-    ? `${yearlyItem.year}: ${formatCount(rows.length)} unique active holding intervals, ${formatCount(yearlyItem.available)} max available stocks, ${formatCount(yearlyItem.completed)} completed returns applied, year return ${formatPct(yearlyItem.yearReturn)}`
-    : `${item.period}: ${formatCount(item.holdings)} active holdings from ${formatCount(item.available)} available stocks, ${formatCount(item.completed || 0)} completed returns applied, period return ${formatPct(item.return)}`;
+    ? `${yearlyItem.year}: ${formatCount(rows.length)} unique active holding intervals, ${formatCount(yearlyItem.available)} max available stocks, ${formatCount(yearlyItem.completed)} intervals closed, year return ${formatPct(yearlyItem.yearReturn)}`
+    : `${item.period}: ${formatCount(item.holdings)} active holdings from ${formatCount(item.available)} available stocks, ${formatCount(item.completed || 0)} intervals closed, monthly return ${formatPct(item.return)}`;
   return `
     <p>${heading}</p>
     <table>

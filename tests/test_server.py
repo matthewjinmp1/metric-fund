@@ -153,21 +153,18 @@ class BacktestTests(unittest.TestCase):
         with temp, patch.object(server, "DB_PATH", db_path):
             result = server.build_backtest(payload)
 
-        self.assertEqual(result["periods"], 3)
+        self.assertEqual(result["periods"], 7)
         self.assertGreaterEqual(result["elapsedSeconds"], 0)
-        self.assertEqual(result["series"][0]["period"], "2020-03")
+        self.assertEqual([point["period"] for point in result["series"]], ["2020-03", "2020-04", "2020-05", "2020-06", "2020-07", "2020-08", "2020-09"])
         self.assertEqual(result["series"][0]["available"], 2)
         self.assertEqual(result["series"][0]["sample"][0]["ticker"], "AAA")
-        self.assertEqual(result["series"][0]["completed"], 0)
-        self.assertEqual(result["series"][1]["period"], "2020-06")
-        self.assertEqual(result["series"][1]["available"], 2)
-        self.assertEqual(result["series"][1]["completed"], 1)
-        self.assertEqual(result["series"][1]["completedSample"][0]["ticker"], "AAA")
-        self.assertEqual(result["series"][1]["completedSample"][0]["startPeriod"], "2020-03")
-        self.assertEqual(result["series"][1]["completedSample"][0]["endPeriod"], "2020-06")
-        self.assertAlmostEqual(result["series"][1]["return"], 0.3)
-        self.assertEqual(result["series"][2]["completedSample"][0]["ticker"], "BBB")
-        self.assertEqual(result["series"][2]["period"], "2020-09")
+        self.assertAlmostEqual(result["series"][0]["return"], 1.3 ** (1 / 3) - 1)
+        self.assertEqual(result["series"][3]["completed"], 1)
+        self.assertEqual(result["series"][3]["completedSample"][0]["ticker"], "AAA")
+        self.assertEqual(result["series"][3]["completedSample"][0]["startPeriod"], "2020-03")
+        self.assertEqual(result["series"][3]["completedSample"][0]["endPeriod"], "2020-06")
+        self.assertAlmostEqual(result["series"][3]["return"], 1.1 ** (1 / 3) - 1)
+        self.assertEqual(result["series"][6]["completedSample"][0]["ticker"], "BBB")
         self.assertAlmostEqual(result["finalValue"], 143.0)
 
     def test_default_roa_uses_quickfs_ratio_instead_of_quarterly_income_over_assets(self):
@@ -231,12 +228,13 @@ class BacktestTests(unittest.TestCase):
         with temp, patch.object(server, "DB_PATH", db_path):
             result = server.build_backtest(payload)
 
-        self.assertEqual([point["period"] for point in result["series"]], ["2020-03", "2020-04", "2020-06", "2020-07"])
+        self.assertEqual([point["period"] for point in result["series"]], ["2020-03", "2020-04", "2020-05", "2020-06", "2020-07"])
         self.assertEqual(result["series"][0]["sample"][0]["ticker"], "MAR")
         self.assertEqual({row["ticker"] for row in result["series"][1]["sample"]}, {"MAR", "APR"})
-        self.assertEqual(result["series"][2]["completedSample"][0]["ticker"], "MAR")
-        self.assertEqual(result["series"][3]["completedSample"][0]["ticker"], "APR")
-        self.assertAlmostEqual(result["finalValue"], 121.0)
+        self.assertEqual({row["ticker"] for row in result["series"][2]["sample"]}, {"MAR", "APR"})
+        self.assertEqual(result["series"][3]["completedSample"][0]["ticker"], "MAR")
+        self.assertEqual(result["series"][4]["completedSample"][0]["ticker"], "APR")
+        self.assertAlmostEqual(result["finalValue"], 113.55081270020041)
 
     def test_backtest_series_shows_active_holdings_snapshot(self):
         temp, db_path = write_test_db(
@@ -272,11 +270,11 @@ class BacktestTests(unittest.TestCase):
         self.assertEqual(result["series"][0]["period"], "2020-03")
         self.assertEqual(result["series"][0]["available"], 1)
         self.assertEqual(result["series"][0]["sample"][0]["ticker"], "OLD")
-        self.assertEqual(result["series"][1]["period"], "2020-06")
-        self.assertEqual(result["series"][1]["available"], 1)
-        self.assertEqual(result["series"][1]["completedSample"][0]["ticker"], "OLD")
-        self.assertEqual(result["series"][1]["sample"][0]["ticker"], "ACTIVE")
-        self.assertEqual(result["series"][1]["holdings"], 1)
+        self.assertEqual(result["series"][3]["period"], "2020-06")
+        self.assertEqual(result["series"][3]["available"], 1)
+        self.assertEqual(result["series"][3]["completedSample"][0]["ticker"], "OLD")
+        self.assertEqual(result["series"][3]["sample"][0]["ticker"], "ACTIVE")
+        self.assertEqual(result["series"][3]["holdings"], 1)
 
     def test_backtest_series_includes_all_active_holdings(self):
         rows = []
