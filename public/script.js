@@ -7,6 +7,7 @@ const state = {
   selectedPeriodIndex: null,
   yearlyItems: [],
   positionItems: [],
+  positionSort: { key: "totalMonths", direction: "desc" },
 };
 
 const starterMetricRevisions = new Map(
@@ -86,6 +87,7 @@ async function init() {
   $("metric-search").addEventListener("input", renderBaseMetrics);
   $("period-list").addEventListener("click", handlePeriodClick);
   $("saved-backtests").addEventListener("click", handleSavedBacktestClick);
+  $("position-history").addEventListener("click", handlePositionHistoryClick);
   window.addEventListener("hashchange", renderRoute);
   await refreshSavedBacktests();
   renderRoute();
@@ -531,7 +533,7 @@ function positionSummaryItems(result) {
 function renderPositionHistory() {
   const target = $("position-history");
   if (!target) return;
-  const rows = state.positionItems || [];
+  const rows = sortedPositionItems(state.positionItems || []);
   if (!rows.length) {
     target.innerHTML = '<div class="empty">No positions yet.</div>';
     return;
@@ -542,16 +544,16 @@ function renderPositionHistory() {
         <thead>
           <tr>
             <th>Rank</th>
-            <th>Ticker</th>
-            <th>Company</th>
-            <th>Held</th>
-            <th>Intervals</th>
-            <th>First Held</th>
-            <th>Last Held</th>
-            <th>Avg Return</th>
-            <th>Compounded Return</th>
-            <th>Latest Market Cap</th>
-            <th>Latest Revenue</th>
+            ${sortablePositionHeader("ticker", "Ticker")}
+            ${sortablePositionHeader("companyName", "Company")}
+            ${sortablePositionHeader("totalMonths", "Held")}
+            ${sortablePositionHeader("intervalCount", "Intervals")}
+            ${sortablePositionHeader("firstHeld", "First Held")}
+            ${sortablePositionHeader("lastHeld", "Last Held")}
+            ${sortablePositionHeader("averageReturn", "Avg Return")}
+            ${sortablePositionHeader("compoundedReturn", "Compounded Return")}
+            ${sortablePositionHeader("latestMarketCap", "Latest Market Cap")}
+            ${sortablePositionHeader("latestRevenue", "Latest Revenue")}
           </tr>
         </thead>
         <tbody>
@@ -578,6 +580,44 @@ function renderPositionHistory() {
       </table>
     </div>
   `;
+}
+
+
+function handlePositionHistoryClick(event) {
+  const button = event.target.closest("[data-position-sort]");
+  if (!button) return;
+  const key = button.dataset.positionSort;
+  state.positionSort = {
+    key,
+    direction: state.positionSort.key === key && state.positionSort.direction === "desc" ? "asc" : "desc",
+  };
+  renderPositionHistory();
+}
+
+function sortablePositionHeader(key, label) {
+  const isCurrent = state.positionSort.key === key;
+  const direction = isCurrent ? state.positionSort.direction : "";
+  const suffix = direction === "asc" ? " ↑" : direction === "desc" ? " ↓" : "";
+  return `<th><button class="sort-button" type="button" data-position-sort="${escapeAttr(key)}" aria-sort="${isCurrent ? direction : "none"}">${escapeHtml(label)}${suffix}</button></th>`;
+}
+
+function sortedPositionItems(rows) {
+  const { key, direction } = state.positionSort;
+  const multiplier = direction === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const primary = comparePositionValues(a[key], b[key]);
+    if (primary) return primary * multiplier;
+    return String(a.ticker || "").localeCompare(String(b.ticker || ""));
+  });
+}
+
+function comparePositionValues(a, b) {
+  const leftNumber = Number(a);
+  const rightNumber = Number(b);
+  if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) return leftNumber - rightNumber;
+  const periodCompare = comparePeriods(a, b);
+  if (periodCompare) return periodCompare;
+  return String(a ?? "").localeCompare(String(b ?? ""));
 }
 
 function formatHeldTime(months) {

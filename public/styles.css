@@ -424,6 +424,24 @@ th {
   font-size: 12px;
 }
 
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.sort-button:hover {
+  color: var(--accent-dark);
+}
+
 .empty,
 .error {
   border-radius: 7px;

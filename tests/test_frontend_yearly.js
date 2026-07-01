@@ -12,7 +12,7 @@ const sandbox = {
   setInterval() {},
 };
 vm.createContext(sandbox);
-vm.runInContext(`${source}\nthis.yearlyPeriodItems = yearlyPeriodItems; this.positionSummaryItems = positionSummaryItems;`, sandbox);
+vm.runInContext(`${source}\nthis.yearlyPeriodItems = yearlyPeriodItems; this.positionSummaryItems = positionSummaryItems; this.sortedPositionItems = sortedPositionItems; this.state = state;`, sandbox);
 
 const result = {
   startValue: 100,
@@ -90,3 +90,19 @@ assert.ok(Math.abs(positions[0].compoundedReturn - 0.155) < 0.000001);
 assert.strictEqual(positions[1].ticker, "MSFT");
 assert.strictEqual(positions[1].intervalCount, 2);
 assert.strictEqual(positions[1].totalMonths, 2);
+
+
+sandbox.state.positionSort = { key: "ticker", direction: "asc" };
+const tickerAsc = sandbox.sortedPositionItems(positions);
+assert.strictEqual(tickerAsc[0].ticker, "AAPL");
+assert.strictEqual(tickerAsc[1].ticker, "MSFT");
+
+sandbox.state.positionSort = { key: "ticker", direction: "desc" };
+const tickerDesc = sandbox.sortedPositionItems(positions);
+assert.strictEqual(tickerDesc[0].ticker, "MSFT");
+assert.strictEqual(tickerDesc[1].ticker, "AAPL");
+
+sandbox.state.positionSort = { key: "totalMonths", direction: "asc" };
+const heldAsc = sandbox.sortedPositionItems(positions);
+assert.strictEqual(heldAsc[0].ticker, "MSFT");
+assert.strictEqual(heldAsc[1].ticker, "AAPL");
