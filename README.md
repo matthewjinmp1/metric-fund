@@ -44,3 +44,13 @@ threshold far stricter than an annual ROA screen.
 This is an early prototype. It does not yet handle filing lags, liquidity constraints, delistings, survivorship bias, slippage, taxes, or transaction costs.
 
 Saved backtests are stored server-side in `data/saved_backtests.json` and can be reloaded without recalculating.
+
+## Testing
+
+Run the full local test suite with:
+
+```bash
+./run_tests.sh
+```
+
+This runs the Python unit tests, checks frontend JavaScript syntax, and runs the frontend aggregation tests.
