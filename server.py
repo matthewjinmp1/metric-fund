@@ -433,7 +433,7 @@ def build_backtest(payload):
                 "holdings": len(active_holdings),
                 "available": available_count,
                 "completed": len(completed),
-                "sample": active_holdings[:50],
+                "sample": active_holdings,
                 "completedSample": completed[:20],
             }
         )

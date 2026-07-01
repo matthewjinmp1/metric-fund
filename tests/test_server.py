@@ -273,6 +273,33 @@ class BacktestTests(unittest.TestCase):
         self.assertEqual(result["series"][1]["sample"][0]["ticker"], "ACTIVE")
         self.assertEqual(result["series"][1]["holdings"], 1)
 
+    def test_backtest_series_includes_all_active_holdings(self):
+        rows = []
+        for index in range(55):
+            rows.append(
+                {
+                    "ticker": f"H{index:02d}",
+                    "data": {
+                        "period_end_date": ["2020-03", "2020-06"],
+                        "net_income": [20, 20],
+                        "total_assets": [100, 100],
+                        "period_end_price": [10, 11],
+                    },
+                }
+            )
+        temp, db_path = write_test_db(rows)
+        payload = {
+            "metrics": [{"name": "ROA", "formula": "net_income / total_assets"}],
+            "conditions": [{"metric": "ROA", "operator": ">", "value": 0.1}],
+        }
+
+        with temp, patch.object(server, "DB_PATH", db_path):
+            result = server.build_backtest(payload)
+
+        self.assertEqual(result["series"][0]["holdings"], 55)
+        self.assertEqual(len(result["series"][0]["sample"]), 55)
+        self.assertEqual(result["series"][0]["sample"][-1]["ticker"], "H54")
+
     def test_backtest_applies_minimum_revenue_filter(self):
         temp, db_path = write_test_db(
             [
