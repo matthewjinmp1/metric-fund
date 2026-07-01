@@ -442,6 +442,30 @@ th {
   color: var(--accent-dark);
 }
 
+.link-button {
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-dark);
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.position-detail-row td {
+  background: #f8faf8;
+}
+
+.position-detail {
+  overflow-x: auto;
+  padding: 6px 0;
+}
+
 .empty,
 .error {
   border-radius: 7px;

@@ -8,6 +8,7 @@ const state = {
   yearlyItems: [],
   positionItems: [],
   positionSort: { key: "totalMonths", direction: "desc" },
+  expandedPositionTicker: null,
 };
 
 const starterMetricRevisions = new Map(
@@ -558,23 +559,7 @@ function renderPositionHistory() {
         </thead>
         <tbody>
           ${rows
-            .map(
-              (row, index) => `
-                <tr>
-                  <td>${index + 1}</td>
-                  <td>${escapeHtml(row.ticker)}</td>
-                  <td>${escapeHtml(row.companyName || "")}</td>
-                  <td>${formatHeldTime(row.totalMonths)}</td>
-                  <td>${formatCount(row.intervalCount)}</td>
-                  <td>${escapeHtml(row.firstHeld)}</td>
-                  <td>${escapeHtml(row.lastHeld)}</td>
-                  <td>${formatPct(row.averageReturn)}</td>
-                  <td>${formatPct(row.compoundedReturn)}</td>
-                  <td>${formatNumber(row.latestMarketCap)}</td>
-                  <td>${formatNumber(row.latestRevenue)}</td>
-                </tr>
-              `,
-            )
+            .map((row, index) => positionHistoryRowHtml(row, index))
             .join("")}
         </tbody>
       </table>
@@ -584,14 +569,134 @@ function renderPositionHistory() {
 
 
 function handlePositionHistoryClick(event) {
-  const button = event.target.closest("[data-position-sort]");
-  if (!button) return;
-  const key = button.dataset.positionSort;
-  state.positionSort = {
-    key,
-    direction: state.positionSort.key === key && state.positionSort.direction === "desc" ? "asc" : "desc",
-  };
+  const sortButton = event.target.closest("[data-position-sort]");
+  if (sortButton) {
+    const key = sortButton.dataset.positionSort;
+    state.positionSort = {
+      key,
+      direction: state.positionSort.key === key && state.positionSort.direction === "desc" ? "asc" : "desc",
+    };
+    renderPositionHistory();
+    return;
+  }
+  const rowButton = event.target.closest("[data-position-ticker]");
+  if (!rowButton) return;
+  const ticker = rowButton.dataset.positionTicker;
+  state.expandedPositionTicker = state.expandedPositionTicker === ticker ? null : ticker;
   renderPositionHistory();
+}
+
+
+function positionHistoryRowHtml(row, index) {
+  const isExpanded = state.expandedPositionTicker === row.ticker;
+  return `
+    <tr>
+      <td>${index + 1}</td>
+      <td><button class="link-button" type="button" data-position-ticker="${escapeAttr(row.ticker)}" aria-expanded="${isExpanded}">${escapeHtml(row.ticker)}</button></td>
+      <td>${escapeHtml(row.companyName || "")}</td>
+      <td>${formatHeldTime(row.totalMonths)}</td>
+      <td>${formatCount(row.intervalCount)}</td>
+      <td>${escapeHtml(row.firstHeld)}</td>
+      <td>${escapeHtml(row.lastHeld)}</td>
+      <td>${formatPct(row.averageReturn)}</td>
+      <td>${formatPct(row.compoundedReturn)}</td>
+      <td>${formatNumber(row.latestMarketCap)}</td>
+      <td>${formatNumber(row.latestRevenue)}</td>
+    </tr>
+    ${isExpanded ? positionStreakDetailHtml(row) : ""}
+  `;
+}
+
+function positionStreakDetailHtml(row) {
+  const streaks = continuousPositionStreaks(row.intervals || []);
+  return `
+    <tr class="position-detail-row">
+      <td colspan="11">
+        <div class="position-detail">
+          <table>
+            <thead>
+              <tr>
+                <th>Continuous Period</th>
+                <th>Held</th>
+                <th>Intervals</th>
+                <th>Compounded Return</th>
+                <th>Avg Return</th>
+                <th>Start Price</th>
+                <th>End Price</th>
+                <th>Latest Market Cap</th>
+                <th>Latest Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${streaks
+                .map(
+                  (streak) => `
+                    <tr>
+                      <td>${escapeHtml(streak.startPeriod)} to ${escapeHtml(streak.endPeriod)}</td>
+                      <td>${formatHeldTime(streak.totalMonths)}</td>
+                      <td>${formatCount(streak.intervalCount)}</td>
+                      <td>${formatPct(streak.compoundedReturn)}</td>
+                      <td>${formatPct(streak.averageReturn)}</td>
+                      <td>${formatNumber(streak.startPrice)}</td>
+                      <td>${formatNumber(streak.endPrice)}</td>
+                      <td>${formatNumber(streak.latestMarketCap)}</td>
+                      <td>${formatNumber(streak.latestRevenue)}</td>
+                    </tr>
+                  `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function continuousPositionStreaks(intervals) {
+  const sorted = [...intervals].sort(compareHoldingRows);
+  const streaks = [];
+  sorted.forEach((interval) => {
+    const last = streaks[streaks.length - 1];
+    if (!last || comparePeriods(interval.startPeriod, last.endPeriod) !== 0) {
+      streaks.push(newPositionStreak(interval));
+      return;
+    }
+    appendIntervalToStreak(last, interval);
+  });
+  return streaks;
+}
+
+function newPositionStreak(interval) {
+  const returnValue = Number.isFinite(interval.return) ? interval.return : 0;
+  return {
+    startPeriod: interval.startPeriod,
+    endPeriod: interval.endPeriod,
+    intervalCount: 1,
+    totalMonths: intervalMonths(interval.startPeriod, interval.endPeriod),
+    totalReturnFactor: 1 + returnValue,
+    returnSum: returnValue,
+    averageReturn: returnValue,
+    compoundedReturn: returnValue,
+    startPrice: interval.price,
+    endPrice: interval.nextPrice,
+    latestMarketCap: interval.marketCap,
+    latestRevenue: interval.revenue,
+  };
+}
+
+function appendIntervalToStreak(streak, interval) {
+  const returnValue = Number.isFinite(interval.return) ? interval.return : 0;
+  streak.endPeriod = interval.endPeriod;
+  streak.intervalCount += 1;
+  streak.totalMonths += intervalMonths(interval.startPeriod, interval.endPeriod);
+  streak.totalReturnFactor *= 1 + returnValue;
+  streak.returnSum += returnValue;
+  streak.averageReturn = streak.returnSum / streak.intervalCount;
+  streak.compoundedReturn = streak.totalReturnFactor - 1;
+  streak.endPrice = interval.nextPrice;
+  streak.latestMarketCap = interval.marketCap;
+  streak.latestRevenue = interval.revenue;
 }
 
 function sortablePositionHeader(key, label) {

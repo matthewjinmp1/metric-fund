@@ -12,7 +12,7 @@ const sandbox = {
   setInterval() {},
 };
 vm.createContext(sandbox);
-vm.runInContext(`${source}\nthis.yearlyPeriodItems = yearlyPeriodItems; this.positionSummaryItems = positionSummaryItems; this.sortedPositionItems = sortedPositionItems; this.state = state;`, sandbox);
+vm.runInContext(`${source}\nthis.yearlyPeriodItems = yearlyPeriodItems; this.positionSummaryItems = positionSummaryItems; this.sortedPositionItems = sortedPositionItems; this.continuousPositionStreaks = continuousPositionStreaks; this.state = state;`, sandbox);
 
 const result = {
   startValue: 100,
@@ -106,3 +106,21 @@ sandbox.state.positionSort = { key: "totalMonths", direction: "asc" };
 const heldAsc = sandbox.sortedPositionItems(positions);
 assert.strictEqual(heldAsc[0].ticker, "MSFT");
 assert.strictEqual(heldAsc[1].ticker, "AAPL");
+
+
+const streaks = sandbox.continuousPositionStreaks([
+  { ticker: "AAPL", startPeriod: "2024-03", endPeriod: "2024-06", return: 0.2, price: 10, nextPrice: 12, marketCap: 2, revenue: 1 },
+  { ticker: "AAPL", startPeriod: "2023-12", endPeriod: "2024-03", return: 0.1, price: 9, nextPrice: 10, marketCap: 1, revenue: 1 },
+  { ticker: "AAPL", startPeriod: "2024-09", endPeriod: "2024-12", return: -0.1, price: 15, nextPrice: 13.5, marketCap: 3, revenue: 2 },
+]);
+assert.strictEqual(streaks.length, 2);
+assert.strictEqual(streaks[0].startPeriod, "2023-12");
+assert.strictEqual(streaks[0].endPeriod, "2024-06");
+assert.strictEqual(streaks[0].intervalCount, 2);
+assert.strictEqual(streaks[0].totalMonths, 6);
+assert.strictEqual(streaks[0].startPrice, 9);
+assert.strictEqual(streaks[0].endPrice, 12);
+assert.ok(Math.abs(streaks[0].compoundedReturn - 0.32) < 0.000001);
+assert.strictEqual(streaks[1].startPeriod, "2024-09");
+assert.strictEqual(streaks[1].endPeriod, "2024-12");
+assert.strictEqual(streaks[1].intervalCount, 1);
