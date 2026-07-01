@@ -6,6 +6,7 @@ const state = {
   savedBacktests: [],
   selectedPeriodIndex: null,
   yearlyItems: [],
+  positionItems: [],
 };
 
 const starterMetricRevisions = new Map(
@@ -401,6 +402,8 @@ function renderResult() {
   drawChart(result.series);
   const yearlyItems = yearlyPeriodItems(result);
   state.yearlyItems = yearlyItems;
+  state.positionItems = positionSummaryItems(result);
+  renderPositionHistory();
   $("period-list").innerHTML = yearlyItems
     .map(
       ({ item, index, year, yearReturn, rows, available }) =>
@@ -445,6 +448,149 @@ function yearlyPeriodItems(result) {
     previousValue = item.value;
   });
   return [...byYear.values()];
+}
+
+
+function positionSummaryItems(result) {
+  const byInterval = new Map();
+  (result.series || []).forEach((item) => {
+    (item.sample || []).forEach((row) => {
+      const key = `${row.ticker}|${row.startPeriod}|${row.endPeriod}`;
+      if (!byInterval.has(key)) byInterval.set(key, row);
+    });
+  });
+
+  const byTicker = new Map();
+  [...byInterval.values()].forEach((row) => {
+    const ticker = row.ticker || "";
+    const existing = byTicker.get(ticker) || {
+      ticker,
+      companyName: row.companyName || "",
+      exchange: row.exchange || "",
+      intervalCount: 0,
+      totalMonths: 0,
+      firstHeld: row.startPeriod,
+      lastHeld: row.endPeriod,
+      totalReturnFactor: 1,
+      returnSum: 0,
+      latestInterval: row,
+      intervals: [],
+    };
+    const months = intervalMonths(row.startPeriod, row.endPeriod);
+    existing.intervalCount += 1;
+    existing.totalMonths += months;
+    existing.firstHeld = minPeriod(existing.firstHeld, row.startPeriod);
+    existing.lastHeld = maxPeriod(existing.lastHeld, row.endPeriod);
+    existing.totalReturnFactor *= 1 + (Number.isFinite(row.return) ? row.return : 0);
+    existing.returnSum += Number.isFinite(row.return) ? row.return : 0;
+    existing.intervals.push(row);
+    if (comparePeriods(row.endPeriod, existing.latestInterval?.endPeriod) > 0) {
+      existing.latestInterval = row;
+    }
+    byTicker.set(ticker, existing);
+  });
+
+  return [...byTicker.values()]
+    .map((item) => ({
+      ...item,
+      totalYears: item.totalMonths / 12,
+      averageReturn: item.intervalCount ? item.returnSum / item.intervalCount : 0,
+      compoundedReturn: item.totalReturnFactor - 1,
+      latestMarketCap: item.latestInterval?.marketCap,
+      latestRevenue: item.latestInterval?.revenue,
+      intervals: item.intervals.sort(compareHoldingRows),
+    }))
+    .sort((a, b) => b.totalMonths - a.totalMonths || String(a.ticker).localeCompare(String(b.ticker)));
+}
+
+function renderPositionHistory() {
+  const target = $("position-history");
+  if (!target) return;
+  const rows = state.positionItems || [];
+  if (!rows.length) {
+    target.innerHTML = '<div class="empty">No positions yet.</div>';
+    return;
+  }
+  target.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Ticker</th>
+            <th>Company</th>
+            <th>Held</th>
+            <th>Intervals</th>
+            <th>First Held</th>
+            <th>Last Held</th>
+            <th>Avg Return</th>
+            <th>Compounded Return</th>
+            <th>Latest Market Cap</th>
+            <th>Latest Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows
+            .map(
+              (row, index) => `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>${escapeHtml(row.ticker)}</td>
+                  <td>${escapeHtml(row.companyName || "")}</td>
+                  <td>${formatHeldTime(row.totalMonths)}</td>
+                  <td>${formatCount(row.intervalCount)}</td>
+                  <td>${escapeHtml(row.firstHeld)}</td>
+                  <td>${escapeHtml(row.lastHeld)}</td>
+                  <td>${formatPct(row.averageReturn)}</td>
+                  <td>${formatPct(row.compoundedReturn)}</td>
+                  <td>${formatNumber(row.latestMarketCap)}</td>
+                  <td>${formatNumber(row.latestRevenue)}</td>
+                </tr>
+              `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function formatHeldTime(months) {
+  const value = Math.max(0, Number(months) || 0);
+  if (value < 12) return `${value} mo`;
+  const years = Math.floor(value / 12);
+  const remainingMonths = value % 12;
+  return remainingMonths ? `${years} yr ${remainingMonths} mo` : `${years} yr`;
+}
+
+function intervalMonths(startPeriod, endPeriod) {
+  const start = parsePeriod(startPeriod);
+  const end = parsePeriod(endPeriod);
+  if (!start || !end) return 0;
+  return Math.max(0, (end.year - start.year) * 12 + (end.month - start.month));
+}
+
+function parsePeriod(period) {
+  const match = String(period || "").match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  return { year: Number(match[1]), month: Number(match[2]) };
+}
+
+function comparePeriods(a, b) {
+  const left = parsePeriod(a);
+  const right = parsePeriod(b);
+  if (!left && !right) return 0;
+  if (!left) return -1;
+  if (!right) return 1;
+  return left.year - right.year || left.month - right.month;
+}
+
+function minPeriod(a, b) {
+  return comparePeriods(a, b) <= 0 ? a : b;
+}
+
+function maxPeriod(a, b) {
+  return comparePeriods(a, b) >= 0 ? a : b;
 }
 
 function compareHoldingRows(a, b) {

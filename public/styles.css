@@ -361,6 +361,14 @@ canvas {
   overflow: auto;
 }
 
+.position-history {
+  overflow-x: auto;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
 .inline-detail:empty {
   display: none;
 }
