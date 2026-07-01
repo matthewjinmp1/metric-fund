@@ -86,7 +86,32 @@ async function init() {
   $("metric-search").addEventListener("input", renderBaseMetrics);
   $("period-list").addEventListener("click", handlePeriodClick);
   $("saved-backtests").addEventListener("click", handleSavedBacktestClick);
+  window.addEventListener("hashchange", renderRoute);
   await refreshSavedBacktests();
+  renderRoute();
+}
+
+function currentRoute() {
+  return window.location.hash === "#/positions" ? "positions" : "main";
+}
+
+function renderRoute() {
+  const route = currentRoute();
+  document.querySelectorAll("[data-view]").forEach((view) => {
+    view.hidden = view.dataset.view !== route;
+  });
+  document.querySelectorAll("[data-route-link]").forEach((link) => {
+    const isCurrent = link.dataset.routeLink === route;
+    link.classList.toggle("selected", isCurrent);
+    link.setAttribute("aria-current", isCurrent ? "page" : "false");
+  });
+  $("page-title").textContent = route === "positions" ? "Position History" : "Build A Fund Rule";
+  $("page-subtitle").textContent =
+    route === "positions"
+      ? "Rank holdings across the whole backtest by total time held."
+      : "Define metrics, filter stocks, and roll positions as each company reports new data.";
+  $("run").hidden = route === "positions";
+  if (route === "positions") renderPositionHistory();
 }
 
 async function requestJson(url, options = {}) {

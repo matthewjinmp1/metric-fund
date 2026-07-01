@@ -30,13 +30,18 @@
         <section class="main">
           <div class="topbar">
             <div>
-              <h2>Build A Fund Rule</h2>
-              <p>Define metrics, filter stocks, and roll positions as each company reports new data.</p>
+              <h2 id="page-title">Build A Fund Rule</h2>
+              <p id="page-subtitle">Define metrics, filter stocks, and roll positions as each company reports new data.</p>
             </div>
-            <button id="run" class="primary">Run Backtest</button>
+            <div class="top-actions">
+              <a href="#/" class="ghost nav-link" data-route-link="main">Builder</a>
+              <a href="#/positions" class="ghost nav-link" data-route-link="positions">Position History</a>
+              <button id="run" class="primary">Run Backtest</button>
+            </div>
           </div>
 
-          <div class="grid">
+          <div id="main-view" data-view="main">
+            <div class="grid">
             <section class="panel">
               <div class="panel-heading">
                 <h2>Custom Metrics</h2>
@@ -60,7 +65,7 @@
             </section>
           </div>
 
-          <section class="panel saved-panel">
+            <section class="panel saved-panel">
             <div class="panel-heading">
               <h2>Saved Backtests</h2>
               <div class="save-controls">
@@ -71,7 +76,7 @@
             <div id="saved-backtests" class="saved-list"></div>
           </section>
 
-          <section class="panel results">
+            <section class="panel results">
             <div class="result-head">
               <div>
                 <h2>Fund Value</h2>
@@ -82,19 +87,23 @@
             <canvas id="chart" width="1100" height="360"></canvas>
           </section>
 
-          <section class="panel">
-            <div class="panel-heading">
-              <h2>Period Detail</h2>
-            </div>
-            <div id="period-list" class="period-list"></div>
-          </section>
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Period Detail</h2>
+              </div>
+              <div id="period-list" class="period-list"></div>
+            </section>
+          </div>
 
-          <section class="panel">
-            <div class="panel-heading">
-              <h2>Position History</h2>
-            </div>
-            <div id="position-history" class="position-history"></div>
-          </section>
+          <div id="positions-view" data-view="positions" hidden>
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Position History</h2>
+                <a href="#/" class="ghost">Back</a>
+              </div>
+              <div id="position-history" class="position-history"></div>
+            </section>
+          </div>
         </section>
       </section>
     </main>

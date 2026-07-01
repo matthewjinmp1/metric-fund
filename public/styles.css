@@ -103,6 +103,30 @@ p {
   margin-bottom: 18px;
 }
 
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.nav-link {
+  display: inline-grid;
+  place-items: center;
+  text-decoration: none;
+}
+
+.nav-link.selected {
+  border-color: var(--accent);
+  background: #edf7f3;
+  color: var(--accent-dark);
+}
+
+[hidden] {
+  display: none !important;
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -433,6 +457,10 @@ th {
   .result-head {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .top-actions {
+    justify-content: flex-start;
   }
 }
 
