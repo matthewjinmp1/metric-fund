@@ -5,6 +5,7 @@ const state = {
   result: null,
   savedBacktests: [],
   selectedPeriodIndex: null,
+  yearlyItems: [],
 };
 
 const starterMetricRevisions = new Map(
@@ -399,15 +400,16 @@ function renderResult() {
   `;
   drawChart(result.series);
   const yearlyItems = yearlyPeriodItems(result);
+  state.yearlyItems = yearlyItems;
   $("period-list").innerHTML = yearlyItems
     .map(
-      ({ item, index, year, yearReturn }) =>
+      ({ item, index, year, yearReturn, rows, available }) =>
         `<div class="period-row">
           <button class="period-item" type="button" data-period-index="${index}" aria-pressed="false">
             <strong>${year}</strong>
             <span>${item.period}</span>
-            <span>${formatCount(item.holdings)} holdings</span>
-            <span>${formatCount(item.available)} available</span>
+            <span>${formatCount(rows.length)} holding intervals</span>
+            <span>${formatCount(available)} max available</span>
             <span>${formatPct(yearReturn)} year return</span>
           </button>
           <div class="detail inline-detail" data-period-detail-index="${index}"></div>
@@ -424,16 +426,37 @@ function yearlyPeriodItems(result) {
     const year = String(item.period).slice(0, 4);
     const existing = byYear.get(year);
     const startValue = existing?.startValue ?? previousValue;
+    const rowsByInterval = existing?.rowsByInterval || new Map();
+    (item.sample || []).forEach((row) => {
+      const key = `${row.ticker}|${row.startPeriod}|${row.endPeriod}`;
+      if (!rowsByInterval.has(key)) rowsByInterval.set(key, row);
+    });
     byYear.set(year, {
       item,
       index,
       year,
       startValue,
       yearReturn: item.value / startValue - 1,
+      rowsByInterval,
+      rows: [...rowsByInterval.values()].sort(compareHoldingRows),
+      available: Math.max(existing?.available || 0, item.available || 0),
+      completed: (existing?.completed || 0) + (item.completed || 0),
     });
     previousValue = item.value;
   });
   return [...byYear.values()];
+}
+
+function compareHoldingRows(a, b) {
+  return (
+    String(a.ticker || "").localeCompare(String(b.ticker || "")) ||
+    String(a.startPeriod || "").localeCompare(String(b.startPeriod || "")) ||
+    String(a.endPeriod || "").localeCompare(String(b.endPeriod || ""))
+  );
+}
+
+function yearlyItemForPeriodIndex(index) {
+  return state.yearlyItems.find((item) => item.index === index);
 }
 
 function handlePeriodClick(event) {
@@ -551,9 +574,13 @@ function renderPeriodDetail(index) {
 function periodDetailHtml(index) {
   const result = state.result;
   const item = result.series[index];
-  const rows = item.sample || [];
+  const yearlyItem = yearlyItemForPeriodIndex(index);
+  const rows = yearlyItem?.rows || item.sample || [];
+  const heading = yearlyItem
+    ? `${yearlyItem.year}: ${formatCount(rows.length)} unique active holding intervals, ${formatCount(yearlyItem.available)} max available stocks, ${formatCount(yearlyItem.completed)} completed returns applied, year return ${formatPct(yearlyItem.yearReturn)}`
+    : `${item.period}: ${formatCount(item.holdings)} active holdings from ${formatCount(item.available)} available stocks, ${formatCount(item.completed || 0)} completed returns applied, period return ${formatPct(item.return)}`;
   return `
-    <p>${item.period}: ${formatCount(item.holdings)} active holdings from ${formatCount(item.available)} available stocks, ${formatCount(item.completed || 0)} completed returns applied, period return ${formatPct(item.return)}</p>
+    <p>${heading}</p>
     <table>
       <thead>
         <tr>
