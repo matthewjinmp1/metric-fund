@@ -416,7 +416,7 @@ function renderResult() {
         </div>`,
     )
     .join("");
-  selectPeriod(Math.max(0, result.series.length - 1));
+  selectPeriod(null);
 }
 
 function yearlyPeriodItems(result) {
