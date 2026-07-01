@@ -373,6 +373,7 @@ def build_backtest(payload):
     base_keys.update(["period_end_price", "dividends", "market_cap", "revenue"])
 
     rows = load_rows()
+    by_start_period = {}
     by_exit_period = {}
     available_intervals = []
     intervals = []
@@ -415,7 +416,6 @@ def build_backtest(payload):
             months_held = period_months(period, next_period)
             if not is_number(total_return) or months_held <= 0:
                 continue
-            monthly_return = (1 + total_return) ** (1 / months_held) - 1 if total_return > -1 else -1
             interval = {
                 "ticker": row["ticker"],
                 "companyName": row["company_name"],
@@ -423,7 +423,6 @@ def build_backtest(payload):
                 "startPeriod": period,
                 "endPeriod": next_period,
                 "return": total_return,
-                "monthlyReturn": monthly_return,
                 "monthsHeld": months_held,
                 "metrics": metric_values,
                 "price": price,
@@ -432,9 +431,14 @@ def build_backtest(payload):
                 "revenue": revenue if is_number(revenue) else None,
             }
             intervals.append(interval)
+            by_start_period.setdefault(period, []).append(interval)
             by_exit_period.setdefault(next_period, []).append(interval)
 
-    value = START_VALUE
+    portfolio_value = START_VALUE
+    cash_value = START_VALUE
+    position_values = {}
+    active_by_ticker = {}
+    previous_value = START_VALUE
     series = []
     month_indexes = [period_month_index(period) for period in snapshot_periods]
     month_indexes = [index for index in month_indexes if index is not None]
@@ -442,23 +446,45 @@ def build_backtest(payload):
     for period in periods:
         period_index = period_month_index(period)
         completed = by_exit_period.get(period, [])
+        for interval in completed:
+            ticker = interval["ticker"]
+            active_interval = active_by_ticker.pop(ticker, None)
+            if active_interval and position_values.get(ticker) is not None:
+                position_values[ticker] *= 1 + interval["return"]
+
+        for interval in by_start_period.get(period, []):
+            active_by_ticker[interval["ticker"]] = interval
+            position_values.setdefault(interval["ticker"], 0)
+
+        total_value = cash_value + sum(position_values.values())
+        active_tickers = sorted(active_by_ticker)
+        if active_tickers:
+            equal_value = total_value / len(active_tickers)
+            position_values = {ticker: equal_value for ticker in active_tickers}
+            cash_value = 0
+        else:
+            position_values = {}
+            cash_value = total_value
+        portfolio_value = total_value
+        period_return = (portfolio_value / previous_value - 1) if previous_value else 0
+        previous_value = portfolio_value
         active_holdings = [
-            interval
-            for interval in intervals
-            if period_month_index(interval["startPeriod"]) <= period_index < period_month_index(interval["endPeriod"])
+            {
+                **active_by_ticker[ticker],
+                "positionValue": position_values.get(ticker, 0),
+            }
+            for ticker in active_tickers
         ]
         available_count = sum(
             1
             for interval in available_intervals
             if period_month_index(interval["startPeriod"]) <= period_index < period_month_index(interval["endPeriod"])
         )
-        avg_return = sum(item["monthlyReturn"] for item in active_holdings) / len(active_holdings) if active_holdings else 0
-        value *= 1 + avg_return
         series.append(
             {
                 "period": period,
-                "value": value,
-                "return": avg_return,
+                "value": portfolio_value,
+                "return": period_return,
                 "holdings": len(active_holdings),
                 "available": available_count,
                 "completed": len(completed),
@@ -475,16 +501,16 @@ def build_backtest(payload):
             "minRevenue": min_revenue,
         },
         "startValue": START_VALUE,
-        "finalValue": value if series else START_VALUE,
-        "totalReturn": (value / START_VALUE - 1) if series else 0,
+        "finalValue": portfolio_value if series else START_VALUE,
+        "totalReturn": (portfolio_value / START_VALUE - 1) if series else 0,
         "periods": len(series),
         "elapsedSeconds": time.perf_counter() - started_at,
         "series": series,
         "excluded": excluded,
         "notes": [
-            "Monthly equal-weight active-interval portfolio.",
-            "A stock enters when a qualifying financial datapoint appears; its next period_end_price return plus dividend is spread geometrically across the months until the next datapoint arrives.",
-            "The detail table shows active holdings as of the selected period; monthly active holding returns are averaged into the fund value.",
+            "Event-driven equal-weight portfolio.",
+            "A stock enters when a qualifying financial datapoint appears; its position value updates only when that stock reaches its next datapoint.",
+            "When datapoints add or remove active holdings, the portfolio rebalances equally across the active qualifying positions; between datapoints, position values are carried forward.",
             "No delisting, liquidity, slippage, survivorship, or filing-lag adjustments yet.",
         ],
     }
